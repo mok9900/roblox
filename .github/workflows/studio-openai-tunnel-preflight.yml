@@ -1,0 +1,29 @@
+name: Studio + OpenAI Tunnel / safe preflight
+on:
+  push:
+    branches:
+      - feature/studio-openai-tunnel-assisted
+    paths:
+      - .github/workflows/studio-openai-tunnel-preflight.yml
+      - ci/assisted/install-windows.ps1
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preflight:
+    name: Verify Studio and official OpenAI client installation
+    runs-on: windows-2025
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Studio and SHA256-verify OpenAI tunnel-client
+        shell: pwsh
+        run: ./ci/assisted/install-windows.ps1
+      - name: Report local MCP launcher presence (no credentials)
+        shell: pwsh
+        run: |
+          $mcp = Join-Path $env:LOCALAPPDATA 'Roblox\mcp.bat'
+          Write-Host "Studio executable present: $(Test-Path $env:STUDIO_EXE)"
+          Write-Host "Studio MCP launcher present: $(Test-Path $mcp)"
+          Write-Host "OpenAI tunnel-client present: $(Test-Path $env:TUNNEL_EXE)"
+          Write-Host 'Preflight only; does not prove authentication or MCP connectivity.'
