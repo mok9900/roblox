@@ -14,7 +14,7 @@ Do not publish account credentials, sessions, screenshots, or OTP codes. Prefer 
 ## Steps
 1. Provision Secure MCP Tunnel in OpenAI Platform, associate it with ChatGPT workspace.
 2. Set the four GitHub Actions secrets yourself.
-3. Trigger ci/assisted/start-session.txt via a GitHub commit on feature/studio-openai-tunnel-assisted.
+3. Create (first run) or update (later runs) ci/assisted/start-session.txt via a GitHub commit on feature/studio-openai-tunnel-assisted.
 4. Actions Windows 2025 installs Roblox Studio and OpenAI tunnel-client, attempts GUI sign-in and MCP toggle, and starts the private tunnel.
 5. ChatGPT web → Plugins → Add custom MCP server → Tunnel → select tunnel ID. Install plugin after successful discovery.
 6. Stop the job in GitHub Actions. Workflow cap is 330 minutes.
@@ -28,3 +28,10 @@ Official docs:
 https://create.roblox.com/docs/studio/mcp
 https://developers.openai.com/api/docs/guides/secure-mcp-tunnels
 https://developers.openai.com/api/docs/guides/custom-mcp-server
+
+## Preflight evidence
+- Windows 2025 Studio installation: passed.
+- Official OpenAI tunnel-client download and SHA256 verification: passed. Installed client version 0.0.21.
+- Local Roblox MCP launcher before login: not present; enabling Studio MCP after login remains necessary.
+- Last successful installation preflight: https://github.com/mok9900/roblox/actions/runs/43840837997
+- GUI accessibility preflight: https://github.com/mok9900/roblox/actions/runs/43841253999
