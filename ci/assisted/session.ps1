@@ -19,6 +19,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Unable to install Windows UI Automation.' }
 Write-Host 'Attempting authorized Roblox GUI sign-in.'
 python .\ci\assisted\login-ui.py
 if ($LASTEXITCODE -ne 0) { throw 'Roblox GUI sign-in not verified (different UI or additional user action needed).' }
+Write-Host 'Opening a fresh unsaved Baseplate place so Studio Assistant/MCP controls become available.'
+python .\ci\assisted\open-test-place-ui.py
+if ($LASTEXITCODE -ne 0) { throw 'Could not open unsaved Baseplate test place after Roblox authentication.' }
 Write-Host 'Enabling the Studio MCP toggle through the official UI.'
 python .\ci\assisted\activate-mcp-ui.py
 if ($LASTEXITCODE -ne 0) { throw 'Studio MCP enable control not reachable via UI automation.' }
