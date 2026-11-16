@@ -46,3 +46,15 @@ https://developers.openai.com/api/docs/guides/custom-mcp-server
 - Run #2: https://github.com/mok9900/roblox/actions/runs/43846388259 — Secrets check and installs passed; submitted Roblox login form, detected additional verification and kept waiting approximately four minutes for an authorized approval. No verified sign-in by timeout; exited safely.
 - Neither run activated Studio MCP nor connected OpenAI Tunnel. There is **no active session** after these failures.
 - Next needed: a supported user-facing approval or secure temporary remote GUI access for interactive account verification. Never send OTP, Roblox password, or recovery codes to a public issue or the chat.
+
+## App-first → email fallback experiment (2026-11-16)
+
+- Run #3: https://github.com/mok9900/roblox/actions/runs/43850623794
+  Studio installed; app approval not confirmed. Alternative-method UI opened but the initial UIA selector could not identify the email method. No OTP issued to the connected Gmail inbox.
+- Run #4: https://github.com/mok9900/roblox/actions/runs/43851413276
+  Studio installed and started. Login submitted. App approval not confirmed after the prompt window. The alternative-method chooser exposed a ListItem and Button named "email", and a separate "backup code" option. The "email" option was successfully clicked.
+  However, a numerical one-time email login code was never relayed; the job ended with OTP_RELAY_TIMEOUT and the tunnel never launched.
+  A Roblox email seen in the connected Gmail inbox at 2026-11-16 10:52 UTC was an **email-address verification link** for XOX_OWNER, not a numerical login OTP. This distinction matters; it is not evidence of successful sign-in.
+- On next attempt, login-ui.py now verifies an actual accessible email OTP input before beginning the encrypted relay wait.
+- Account owner must follow the official email-address verification instructions if the address is not yet verified. Never put the Roblox verification ticket/URL, original OTP, password or recovery codes in the repository.
+- **No active Actions Studio or OpenAI MCP tunnel session remains from these failed runs.**
