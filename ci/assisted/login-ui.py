@@ -1,14 +1,18 @@
 """
-Best-effort consent-based Roblox Studio GUI login through Windows UI Automation.
-Fails closed if the accessible login controls or verification cannot be identified.
-Never logs or stores username, password, cookies, OTP, or screenshots.
-No CAPTCHA/2FA bypass.
+User-authorized Roblox Studio GUI login: app approval first, email-code fallback.
+
+Uses Roblox's own login form and permitted verification methods. Never bypasses
+CAPTCHA / authenticator challenges, captures screenshots, prints tokens, or
+stores passwords. Email OTP is only received through ephemeral RSA-encrypted
+one-time relay scoped to THIS Actions run.
 """
 import os
 import re
 import sys
 import time
 from pywinauto import Desktop
+
+from otp_relay import wait_for_code
 
 USER = os.environ.get("ROBLOX_USERNAME", "")
 PASSWORD = os.environ.get("ROBLOX_PASSWORD", "")
@@ -17,86 +21,227 @@ if not USER or not PASSWORD:
 del os.environ["ROBLOX_PASSWORD"]
 del os.environ["ROBLOX_USERNAME"]
 
+EMAIL_CONTROL = re.compile(
+    r"(?:email.*(?:code|verif)|(?:code|verif).*email|"
+    r"send.*email|이메일.*(?:코드|인증)|(?:코드|인증).*이메일)",
+    re.I,
+)
+OTHER_CONTROL = re.compile(
+    r"(?:try|use|choose|select|verify).*?(?:other|another|different).*?(?:method|way|option)"
+    r"|more (?:options|ways)|different method|"
+    r"다른 (?:방법|수단)|다른 방법으로|다른 인증 수단",
+    re.I,
+)
+CHALLENGE = re.compile(
+    r"2-step|two-step|verification|authenticator|"
+    r"인증 코드|2단계|captcha|보안 확인|verify your identity|"
+    r"approve sign|승인|로그인 시도|다른 방법|another way",
+    re.I,
+)
+EXPIRED = re.compile(r"(?:expired|만료|try again|다시 시도)", re.I)
+CODE = re.compile(r"(?:verification code|email code|enter code|security code|"
+                  r"6.digit|one.time code|인증 코드|이메일 코드|코드 입력)", re.I)
+VERIFY = re.compile(r"^(?:verify|confirm|continue|submit|next|인증|확인|계속|다음)$", re.I)
+LOGIN = re.compile(r"^(?:log in|login|sign in|로그인)$", re.I)
+NAV = frozenset(("file", "view", "test", "model", "파일", "보기", "테스트", "모델"))
+
+
 def windows():
-    return [
-        w for w in Desktop(backend="uia").windows()
-        if w.is_visible() and any(term in (w.window_text() or "").lower()
-            for term in ("roblox", "log in", "login", "sign in"))
-    ]
+    result = []
+    for win in Desktop(backend="uia").windows():
+        try:
+            title = (win.window_text() or "").lower()
+            if win.is_visible() and any(w in title for w in (
+                "roblox", "login", "log in", "sign in", "verification", "verify",
+            )):
+                result.append(win)
+        except Exception:
+            pass
+    return result
 
-def controls(win):
-    try:
-        return [c for c in win.descendants() if c.is_visible()]
-    except Exception:
-        return []
 
-def name(ctrl):
+def controls():
+    out = []
+    for win in windows():
+        try:
+            out.extend(c for c in win.descendants() if c.is_visible())
+        except Exception:
+            continue
+    return out
+
+
+def label(control):
     try:
-        return (ctrl.element_info.name or "").strip().lower()
+        return (control.element_info.name or "").strip().lower()
     except Exception:
         return ""
 
-def type_into(field, val):
-    # A UIA ValuePattern write does not interpret braces or password punctuation as keystroke commands.
-    # Fail closed if this particular Roblox login control doesn't support it.
-    field.set_edit_text(val)
 
-print("Studio GUI login: searching for accessible official login form.")
-deadline = time.time() + 95
-submitted = False
-while time.time() < deadline and not submitted:
-    for win in windows():
-        desc = controls(win)
-        edits = [c for c in desc if c.element_info.control_type in ("Edit", "Document")]
-        user_fields = [c for c in edits if re.search(r"username|email|phone|사용자 이름|이메일", name(c))]
-        pass_fields = [c for c in edits if re.search(r"password|비밀번호", name(c))]
-        submit_buttons = [c for c in desc if c.element_info.control_type in ("Button", "Hyperlink") and
-                          re.search(r"^(log in|login|sign in|로그인)$", name(c))]
-        if len(user_fields) != 1 or len(pass_fields) != 1 or len(submit_buttons) != 1:
-            continue
-        type_into(user_fields[0], USER)
-        type_into(pass_fields[0], PASSWORD)
-        submit_buttons[0].click_input()
-        submitted = True
-        break
-    time.sleep(2)
+def ctype(control):
+    try:
+        return control.element_info.control_type
+    except Exception:
+        return None
 
+
+def success(cs):
+    names = [label(c) for c in cs]
+    nav = any(n in NAV for n in names)
+    auth_fields = any(ctype(c) == "Edit" and
+                      re.search(r"password|비밀번호|username|user name|email|이메일|인증 코드|verification code", label(c))
+                      for c in cs)
+    still_challenged = any(CHALLENGE.search(n) for n in names)
+    return nav and not auth_fields and not still_challenged
+
+
+def find_button(cs, pattern):
+    allowed = ("Button", "Hyperlink", "MenuItem", "RadioButton", "Text")
+    for typ in allowed:
+        matches = [c for c in cs if ctype(c) == typ and pattern.search(label(c))]
+        if len(matches) == 1:
+            return matches[0]
+    return None
+
+
+def click_button(cs, pattern):
+    b = find_button(cs, pattern)
+    if b is None:
+        return False
+    try:
+        b.click_input()
+        return True
+    except Exception:
+        return False
+
+
+def await_studio(deadline):
+    while time.monotonic() < deadline:
+        cs = controls()
+        if success(cs):
+            print("STUDIO_LOGIN_UI_VERIFIED: signed-in Studio menu detected.", flush=True)
+            return True
+        time.sleep(2)
+    return False
+
+
+def find_code_edit(cs):
+    edits = [c for c in cs if ctype(c) == "Edit"]
+    candidates = [c for c in edits if CODE.search(label(c))]
+    if len(candidates) == 1:
+        return [candidates[0]]
+    # A verification-only dialog can have a single unnamed code entry field.
+    if len(edits) == 1 and not any(
+        re.search(r"username|password|email|비밀번호|이메일|사용자", label(c))
+        for c in edits
+    ):
+        return edits
+    if len(candidates) in (6, 8):
+        return candidates
+    return []
+
+
+def enter_code(code):
+    deadline = time.monotonic() + 35
+    while time.monotonic() < deadline:
+        cs = controls()
+        edits = find_code_edit(cs)
+        if len(edits) == 1:
+            edits[0].set_edit_text(code)
+            if not click_button(controls(), VERIFY):
+                # Certain official Roblox forms submit automatically on all digits.
+                print("EMAIL_CODE_ENTERED: awaiting auto-submit or form validation.", flush=True)
+            else:
+                print("EMAIL_CODE_ENTERED: official Verify button clicked.", flush=True)
+            return
+        if len(edits) == len(code):
+            for field, digit in zip(edits, code):
+                field.set_edit_text(digit)
+            click_button(controls(), VERIFY)
+            print("EMAIL_CODE_ENTERED: code digits entered into official verification form.", flush=True)
+            return
+        time.sleep(2)
+    raise SystemExit("EMAIL_CODE_INPUT_NOT_ACCESSIBLE: no unique verification code field")
+
+
+def choose_email():
+    # The email-code option is available only if a verified email exists on the account.
+    for stage in range(12):
+        cs = controls()
+        if click_button(cs, EMAIL_CONTROL):
+            print("EMAIL_FALLBACK_SELECTED: requested Roblox's official email verification.", flush=True)
+            time.sleep(3)
+            return True
+        if stage == 0 and click_button(cs, OTHER_CONTROL):
+            print("EMAIL_FALLBACK_OPENED_ALTERNATIVE_METHODS.", flush=True)
+        time.sleep(2)
+    return False
+
+
+def submit_primary_login():
+    deadline = time.monotonic() + 85
+    while time.monotonic() < deadline:
+        cs = controls()
+        edits = [c for c in cs if ctype(c) == "Edit"]
+        user_fields = [c for c in edits if re.search(r"username|email|phone|사용자 이름|이메일", label(c))]
+        pw_fields = [c for c in edits if re.search(r"password|비밀번호", label(c))]
+        btn = find_button(cs, LOGIN)
+        if len(user_fields) == len(pw_fields) == 1 and btn is not None:
+            user_fields[0].set_edit_text(USER)
+            pw_fields[0].set_edit_text(PASSWORD)
+            btn.click_input()
+            print("ROBLOX_LOGIN_SUBMITTED: official GUI form submitted.", flush=True)
+            return True
+        time.sleep(2)
+    return False
+
+
+print("Studio GUI: beginning official Roblox sign-in.", flush=True)
+submitted = submit_primary_login()
 USER = ""
 PASSWORD = ""
 if not submitted:
-    raise SystemExit("LOGIN_CONTROLS_NOT_ACCESSIBLE: manual consent or different UI required")
+    raise SystemExit("LOGIN_CONTROLS_NOT_ACCESSIBLE")
 
-print("Login form submitted. Waiting for verified Studio sign-in (up to 4 minutes).", flush=True)
-deadline = time.time() + 240
-challenge_seen = False
-last_notice = 0
-while time.time() < deadline:
-    all_visible = windows()
-    ui = []
-    for win in all_visible:
-        ui.extend(controls(win))
-    labels = [name(c) for c in ui]
-    challenge_now = any(
-        re.search(r"2-step|two-step|verification code|authenticator|인증 코드|2단계|captcha|보안 확인|verify your identity|approve sign", x)
-        for x in labels
-    )
-    login_fields_exist = any(
-        c.element_info.control_type == "Edit" and
-        re.search(r"password|비밀번호|username|email|사용자 이름|이메일", name(c))
-        for c in ui
-    )
-    nav = any(x in ("file", "view", "test", "model", "파일", "보기", "테스트", "모델") for x in labels)
-    if challenge_now:
-        challenge_seen = True
-        now = time.time()
-        if now - last_notice > 30:
-            print("ADDITIONAL_VERIFICATION_PENDING: Check your official Roblox app for a sign-in approval request. No OTP or CAPTCHA bypass attempted.", flush=True)
-            last_notice = now
-    if nav and not login_fields_exist and not challenge_now:
-        print("Studio navigation UI detected with no accessible login or challenge form.", flush=True)
+print("APP_APPROVAL_PENDING: open Roblox mobile app NOW and approve this sign-in promptly.", flush=True)
+start = time.monotonic()
+app_deadline = start + 50
+challenge_detected = False
+notice_time = 0
+while time.monotonic() < app_deadline:
+    cs = controls()
+    if success(cs):
+        print("APP_APPROVAL_SUCCEEDED.", flush=True)
         sys.exit(0)
-    time.sleep(4)
+    labels = [label(c) for c in cs]
+    challenge_detected = challenge_detected or any(CHALLENGE.search(n) for n in labels)
+    if challenge_detected and time.monotonic() - notice_time > 12:
+        print("APP_APPROVAL_STILL_PENDING: approve through the Roblox app before the request expires.", flush=True)
+        notice_time = time.monotonic()
+    if any(EXPIRED.search(n) for n in labels):
+        print("APP_APPROVAL_EXPIRED: attempting official email alternative.", flush=True)
+        break
+    time.sleep(2)
 
-if challenge_seen:
-    raise SystemExit("ADDITIONAL_VERIFICATION_STILL_REQUIRED: sign-in was not verified within the approval window")
-raise SystemExit("LOGIN_NOT_VERIFIED: Studio sign-in completion could not be confirmed")
+if not challenge_detected:
+    # No recognized 2FA screen: don't click unknown controls.
+    if await_studio(time.monotonic() + 10):
+        sys.exit(0)
+    raise SystemExit("VERIFICATION_SCREEN_NOT_RECOGNIZED")
+
+if await_studio(time.monotonic() + 3):
+    sys.exit(0)
+
+print("APP_APPROVAL_NOT_CONFIRMED: trying Roblox email code option.", flush=True)
+if not choose_email():
+    raise SystemExit("EMAIL_METHOD_UNAVAILABLE: email option not accessible in Roblox challenge")
+
+print("EMAIL_CODE_REQUESTED: official Roblox email authentication was selected.", flush=True)
+print("OTP_RELAY_READY: encrypted code can be delivered through run-bound GitHub relay.", flush=True)
+code = wait_for_code(timeout=540)
+enter_code(code)
+code = ""  # do not retain code longer than needed
+
+if not await_studio(time.monotonic() + 75):
+    raise SystemExit("EMAIL_CODE_SUBMITTED_BUT_LOGIN_NOT_VERIFIED")
+
+print("EMAIL_FALLBACK_SUCCEEDED.", flush=True)
