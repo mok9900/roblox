@@ -66,20 +66,37 @@ PASSWORD = ""
 if not submitted:
     raise SystemExit("LOGIN_CONTROLS_NOT_ACCESSIBLE: manual consent or different UI required")
 
-print("Login form submitted. Waiting for evidence of Studio login completion.")
-deadline = time.time() + 90
+print("Login form submitted. Waiting for verified Studio sign-in (up to 4 minutes).", flush=True)
+deadline = time.time() + 240
+challenge_seen = False
+last_notice = 0
 while time.time() < deadline:
-    for win in windows():
-        desc = controls(win)
-        labels = [name(c) for c in desc]
-        if any(re.search(r"2-step|two-step|verification code|authenticator|인증 코드|2단계|captcha|보안 확인", x) for x in labels):
-            raise SystemExit("ADDITIONAL_VERIFICATION_REQUIRED")
-        # Conservatively require the Studio navigation UI with no visible login password form.
-        nav = any(x in ("file", "view", "test", "model", "파일", "보기", "테스트", "모델") for x in labels)
-        login_edit = any(c.element_info.control_type == "Edit" and
-                         re.search(r"password|비밀번호", name(c)) for c in desc)
-        if nav and not login_edit:
-            print("Studio navigation UI detected after login form submission.")
-            sys.exit(0)
-    time.sleep(3)
-raise SystemExit("LOGIN_NOT_VERIFIED")
+    all_visible = windows()
+    ui = []
+    for win in all_visible:
+        ui.extend(controls(win))
+    labels = [name(c) for c in ui]
+    challenge_now = any(
+        re.search(r"2-step|two-step|verification code|authenticator|인증 코드|2단계|captcha|보안 확인|verify your identity|approve sign", x)
+        for x in labels
+    )
+    login_fields_exist = any(
+        c.element_info.control_type == "Edit" and
+        re.search(r"password|비밀번호|username|email|사용자 이름|이메일", name(c))
+        for c in ui
+    )
+    nav = any(x in ("file", "view", "test", "model", "파일", "보기", "테스트", "모델") for x in labels)
+    if challenge_now:
+        challenge_seen = True
+        now = time.time()
+        if now - last_notice > 30:
+            print("ADDITIONAL_VERIFICATION_PENDING: Check your official Roblox app for a sign-in approval request. No OTP or CAPTCHA bypass attempted.", flush=True)
+            last_notice = now
+    if nav and not login_fields_exist and not challenge_now:
+        print("Studio navigation UI detected with no accessible login or challenge form.", flush=True)
+        sys.exit(0)
+    time.sleep(4)
+
+if challenge_seen:
+    raise SystemExit("ADDITIONAL_VERIFICATION_STILL_REQUIRED: sign-in was not verified within the approval window")
+raise SystemExit("LOGIN_NOT_VERIFIED: Studio sign-in completion could not be confirmed")
