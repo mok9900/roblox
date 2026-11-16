@@ -6,7 +6,7 @@ New-Item -ItemType Directory -Force -Path $toolDir | Out-Null
 function Get-StudioExe {
     $paths = @(
         (Join-Path $env:ProgramFiles 'Roblox\Versions\*\RobloxStudioBeta.exe'),
-        (Join-Path [Environment]::GetFolderPath('ProgramFilesX86') 'Roblox\Versions\*\RobloxStudioBeta.exe'),
+        (Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Roblox\Versions\*\RobloxStudioBeta.exe'),
         (Join-Path $env:LOCALAPPDATA 'Roblox\Versions\*\RobloxStudioBeta.exe')
     )
     @(Get-ChildItem -Path $paths -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1) |
