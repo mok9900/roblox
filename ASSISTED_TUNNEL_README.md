@@ -58,3 +58,23 @@ https://developers.openai.com/api/docs/guides/custom-mcp-server
 - On next attempt, login-ui.py now verifies an actual accessible email OTP input before beginning the encrypted relay wait.
 - Account owner must follow the official email-address verification instructions if the address is not yet verified. Never put the Roblox verification ticket/URL, original OTP, password or recovery codes in the repository.
 - **No active Actions Studio or OpenAI MCP tunnel session remains from these failed runs.**
+
+## Live Gmail OTP login verification — November 16, 2026
+
+**Run 5: https://github.com/mok9900/roblox/actions/runs/43855667540**
+- Authenticated via Roblox official GUI login form.
+- Mobile app approval wasn't confirmed; clicked official "email" alternative.
+- Connected Gmail received a six-digit 2FA challenge for the intended account.
+- A *run-bound RSA-3072 OAEP-SHA256 ciphertext* was delivered through GitHub; plaintext was not put in the public repo.
+- Runner logs confirm: OTP_RELAY_RECEIVED, EMAIL_CODE_ENTERED, STUDIO_LOGIN_UI_VERIFIED, EMAIL_FALLBACK_SUCCEEDED.
+- Roblox additionally sent a new Windows login security notification from the expected Actions host location.
+- **Failure after successful login**: Assistant UI was not available. Studio did not have a place open.
+
+**Run 6: https://github.com/mok9900/roblox/actions/runs/43857010505**
+- Fixed step order to first open a new unsaved local Baseplate editor after successful login.
+- Again received a fresh Gmail 2FA email and delivered a run-bound encrypted OTP. Verified login via Studio UI.
+- **Failure after successful login**: BASEPLATE_TEMPLATE_NOT_ACCESSIBLE. UI Automation could not find a Baseplate template / New Experience button in Studio's visible accessibility tree.
+- Thus MCP toggle and OpenAI Tunnel were never reached. A successful Roblox login does not by itself prove MCP connectivity.
+- The temporary encrypted OTP relay text files for these completed runs were removed from the active branch. The historical git objects remain ciphertext only.
+
+**Current next issue:** Open an unsaved Roblox Studio place reliably after GUI sign-in in an unattended Windows 2025 GitHub-hosted runner. Studio Assistant and its built-in MCP settings only show with an editor/place open. After solving this, validate Assistant → Settings → MCP Servers → Enable Studio as MCP server, followed by tunnel-client connectivity and list_roblox_studios handshake.
