@@ -277,8 +277,17 @@ print("APP_APPROVAL_NOT_CONFIRMED: trying Roblox email code option.", flush=True
 if not choose_email():
     raise SystemExit("EMAIL_METHOD_UNAVAILABLE: email option not accessible in Roblox challenge")
 
-print("EMAIL_CODE_REQUESTED: official Roblox email authentication was selected.", flush=True)
-print("OTP_RELAY_READY: encrypted code can be delivered through run-bound GitHub relay.", flush=True)
+print("EMAIL_METHOD_SELECTED: checking whether Roblox actually displayed an OTP input.", flush=True)
+code_form_deadline = time.monotonic() + 30
+while time.monotonic() < code_form_deadline:
+    if find_code_edit(controls()):
+        break
+    time.sleep(2)
+else:
+    raise SystemExit("EMAIL_OTP_INPUT_NOT_PRESENT: the selected email action may be address verification instead of an OTP challenge")
+
+print("EMAIL_CODE_FORM_READY: a verification-code input is accessible.", flush=True)
+print("OTP_RELAY_READY: encrypted one-time code can be delivered through run-bound GitHub relay.", flush=True)
 code = wait_for_code(timeout=540)
 enter_code(code)
 code = ""  # do not retain code longer than needed
