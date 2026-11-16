@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/studio-openai-tunnel-preflight.yml
       - ci/assisted/install-windows.ps1
+      - ci/assisted/preflight-gui.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,3 +28,9 @@ jobs:
           Write-Host "Studio MCP launcher present: $(Test-Path $mcp)"
           Write-Host "OpenAI tunnel-client present: $(Test-Path $env:TUNNEL_EXE)"
           Write-Host 'Preflight only; does not prove authentication or MCP connectivity.'
+      - name: Inspect accessible Roblox login GUI without credentials
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --quiet 'pywinauto==0.6.9'
+          Start-Process -FilePath $env:STUDIO_EXE
+          python ./ci/assisted/preflight-gui.py
