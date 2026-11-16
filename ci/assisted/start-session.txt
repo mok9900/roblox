@@ -3,3 +3,4 @@ Requested: 2026-11-16 19:07 KST
 No credentials stored here.
 Retry: 2026-11-16 KST, wait for legitimate Roblox security approval without bypass.
 Retry: 2026-11-16, first prompt approval (50s), then official email code fallback via per-run RSA-OAEP relay.
+Retry with safe GUI option discovery and one unique masked-email choice when available. 2026-11-16.
