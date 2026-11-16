@@ -23,7 +23,8 @@ del os.environ["ROBLOX_USERNAME"]
 
 EMAIL_CONTROL = re.compile(
     r"(?:email.*(?:code|verif)|(?:code|verif).*email|"
-    r"send.*email|이메일.*(?:코드|인증)|(?:코드|인증).*이메일)",
+    r"send.*email|^(?:use |choose |send to )?(?:e-?mail|이메일)$|"
+    r"이메일.*(?:코드|인증)|(?:코드|인증).*이메일)",
     re.I,
 )
 OTHER_CONTROL = re.compile(
@@ -52,7 +53,7 @@ def windows():
         try:
             title = (win.window_text() or "").lower()
             if win.is_visible() and any(w in title for w in (
-                "roblox", "login", "log in", "sign in", "verification", "verify",
+                "roblox", "login", "log in", "sign in", "verification", "verify", "method", "options", "another", "이메일", "인증",
             )):
                 result.append(win)
         except Exception:
@@ -95,7 +96,7 @@ def success(cs):
 
 
 def find_button(cs, pattern):
-    allowed = ("Button", "Hyperlink", "MenuItem", "RadioButton", "Text")
+    allowed = ("Button", "Hyperlink", "MenuItem", "RadioButton", "TabItem", "ListItem", "Text", "Custom")
     for typ in allowed:
         matches = [c for c in cs if ctype(c) == typ and pattern.search(label(c))]
         if len(matches) == 1:
@@ -163,17 +164,58 @@ def enter_code(code):
     raise SystemExit("EMAIL_CODE_INPUT_NOT_ACCESSIBLE: no unique verification code field")
 
 
+def safe_choice_diagnostics():
+    # Only print generic, non-identifying UI controls. Never log usernames,
+    # email addresses, verification codes, or free-form text containing digits.
+    count = 0
+    terms = ("email", "mail", "method", "way", "code", "option", "verify", "verification",
+             "이메일", "인증", "코드", "방법", "수단", "다른", "alternative")
+    for c in controls():
+        n = label(c)
+        if (0 < len(n) < 85 and "@" not in n and
+                re.fullmatch(r"[a-z가-힣 \-?!.]+", n, re.I) and
+                any(k in n for k in terms) and
+                ctype(c) in ("Button", "Hyperlink", "MenuItem", "RadioButton", "TabItem", "ListItem", "Text", "Custom")):
+            print(f"SAFE_UIA_OPTION: {ctype(c)} | {n}", flush=True)
+            count += 1
+            if count >= 18:
+                break
+    print(f"SAFE_UIA_OPTION_COUNT: {count}", flush=True)
+
+
 def choose_email():
     # The email-code option is available only if a verified email exists on the account.
-    for stage in range(12):
+    alternatives_opened = False
+    for stage in range(15):
         cs = controls()
         if click_button(cs, EMAIL_CONTROL):
             print("EMAIL_FALLBACK_SELECTED: requested Roblox's official email verification.", flush=True)
             time.sleep(3)
             return True
-        if stage == 0 and click_button(cs, OTHER_CONTROL):
+        # A masked account address may be the email option. Only select it from
+        # the officially opened alternative-verification menu, never elsewhere.
+        if alternatives_opened:
+            email_buttons = [
+                c for c in cs
+                if ctype(c) in ("Button", "Hyperlink", "RadioButton", "ListItem", "Text")
+                and "@" in label(c) and len(label(c)) < 110
+                and not re.search(r"password|username|비밀번호|사용자", label(c))
+            ]
+            if len(email_buttons) == 1:
+                try:
+                    email_buttons[0].click_input()
+                    print("EMAIL_FALLBACK_SELECTED: selected unique masked-email verification option.", flush=True)
+                    time.sleep(3)
+                    return True
+                except Exception:
+                    pass
+        if not alternatives_opened and click_button(cs, OTHER_CONTROL):
+            alternatives_opened = True
             print("EMAIL_FALLBACK_OPENED_ALTERNATIVE_METHODS.", flush=True)
+            time.sleep(2)
+            safe_choice_diagnostics()
         time.sleep(2)
+    safe_choice_diagnostics()
     return False
 
 
