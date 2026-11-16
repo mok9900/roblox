@@ -40,3 +40,9 @@ https://developers.openai.com/api/docs/guides/custom-mcp-server
 - Verified on an actual Windows 2025 Actions runner: 2 Studio/login windows, exactly 1 accessible username field, 1 password field, and 1 login button.
 - Credential-free UIA probe succeeded; no credentials submitted and no Roblox login succeeded or failed.
 - https://github.com/mok9900/roblox/actions/runs/43841253999
+
+## On-demand session results — 2026-11-16
+- Run #1: https://github.com/mok9900/roblox/actions/runs/43845956553 — Secrets check and installs passed; UI automation submitted Roblox login form, then detected additional verification and exited safely.
+- Run #2: https://github.com/mok9900/roblox/actions/runs/43846388259 — Secrets check and installs passed; submitted Roblox login form, detected additional verification and kept waiting approximately four minutes for an authorized approval. No verified sign-in by timeout; exited safely.
+- Neither run activated Studio MCP nor connected OpenAI Tunnel. There is **no active session** after these failures.
+- Next needed: a supported user-facing approval or secure temporary remote GUI access for interactive account verification. Never send OTP, Roblox password, or recovery codes to a public issue or the chat.
