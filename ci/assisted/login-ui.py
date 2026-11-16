@@ -9,7 +9,6 @@ import re
 import sys
 import time
 from pywinauto import Desktop
-from pywinauto.keyboard import send_keys
 
 USER = os.environ.get("ROBLOX_USERNAME", "")
 PASSWORD = os.environ.get("ROBLOX_PASSWORD", "")
@@ -38,10 +37,9 @@ def name(ctrl):
         return ""
 
 def type_into(field, val):
-    # Does not print secrets. Operates ONLY on named login form elements.
-    field.click_input()
-    send_keys("^a")
-    send_keys(val, with_spaces=True, pause=0.01, vk_packet=True)
+    # A UIA ValuePattern write does not interpret braces or password punctuation as keystroke commands.
+    # Fail closed if this particular Roblox login control doesn't support it.
+    field.set_edit_text(val)
 
 print("Studio GUI login: searching for accessible official login form.")
 deadline = time.time() + 95
