@@ -35,3 +35,8 @@ https://developers.openai.com/api/docs/guides/custom-mcp-server
 - Local Roblox MCP launcher before login: not present; enabling Studio MCP after login remains necessary.
 - Last successful installation preflight: https://github.com/mok9900/roblox/actions/runs/43840837997
 - GUI accessibility preflight: https://github.com/mok9900/roblox/actions/runs/43841253999
+
+## GUI access probe (2026-11-16)
+- Verified on an actual Windows 2025 Actions runner: 2 Studio/login windows, exactly 1 accessible username field, 1 password field, and 1 login button.
+- Credential-free UIA probe succeeded; no credentials submitted and no Roblox login succeeded or failed.
+- https://github.com/mok9900/roblox/actions/runs/43841253999
