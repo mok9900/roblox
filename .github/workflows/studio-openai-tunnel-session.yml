@@ -1,0 +1,37 @@
+name: Assisted Roblox Studio / OpenAI Secure MCP Tunnel session
+on:
+  push:
+    branches:
+      - feature/studio-openai-tunnel-assisted
+    paths:
+      - ci/assisted/start-session.txt
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: roblox-studio-openai-tunnel-single-instance
+  cancel-in-progress: false
+jobs:
+  studio-tunnel-session:
+    name: Windows Studio GUI sign-in and private MCP tunnel
+    runs-on: windows-2025
+    timeout-minutes: 330
+    env:
+      ROBLOX_USERNAME: ${{ secrets.ROBLOX_USERNAME }}
+      ROBLOX_PASSWORD: ${{ secrets.ROBLOX_PASSWORD }}
+      CONTROL_PLANE_API_KEY: ${{ secrets.OPENAI_TUNNEL_RUNTIME_KEY }}
+      CONTROL_PLANE_TUNNEL_ID: ${{ secrets.OPENAI_TUNNEL_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required secrets without printing values
+        shell: pwsh
+        run: |
+          if (-not $env:ROBLOX_USERNAME -or -not $env:ROBLOX_PASSWORD) { throw 'Missing ROBLOX_USERNAME or ROBLOX_PASSWORD secrets.' }
+          if (-not $env:CONTROL_PLANE_API_KEY -or -not $env:CONTROL_PLANE_TUNNEL_ID) { throw 'Missing OPENAI_TUNNEL_RUNTIME_KEY or OPENAI_TUNNEL_ID secrets.' }
+          Write-Host 'Required secrets exist.'
+      - name: Install Studio and official OpenAI tunnel client
+        shell: pwsh
+        run: ./ci/assisted/install-windows.ps1
+      - name: Login, enable MCP, and maintain OpenAI Tunnel
+        shell: pwsh
+        run: ./ci/assisted/session.ps1
