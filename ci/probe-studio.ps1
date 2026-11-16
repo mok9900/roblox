@@ -22,7 +22,8 @@ function Find-StudioExe {
     $programFilesX86 = [Environment]::GetFolderPath('ProgramFilesX86')
     $patterns = @(
         (Join-Path $env:LOCALAPPDATA 'Roblox\Versions\*\RobloxStudioBeta.exe'),
-        (Join-Path $programFilesX86 'Roblox\Versions\*\RobloxStudioBeta.exe')
+        (Join-Path $programFilesX86 'Roblox\Versions\*\RobloxStudioBeta.exe'),
+        (Join-Path $env:ProgramFiles 'Roblox\Versions\*\RobloxStudioBeta.exe')
     )
     $found = @(Get-ChildItem -Path $patterns -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
     if ($found.Count -gt 0) { return $found[0] }
@@ -60,7 +61,11 @@ try {
     if ($null -eq $studio) { throw 'RobloxStudioBeta.exe not found after 7 minutes.' }
     $state.is_installed = $true
     $state.studio_path = $studio.FullName
+    $state.mcp_launcher_present = Test-Path (Join-Path $env:LOCALAPPDATA 'Roblox\mcp.bat')
     Write-Host "Studio installed: $($studio.FullName)"
+    Write-Host 'Close installer-started Studio so the CLI test starts its own process.'
+    Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 3
     Write-Host '=== RUN OFFICIAL --task RunScript SMOKE TEST ==='
     if (-not (Test-Path $smokeFile)) { throw "Missing smoke script: $smokeFile" }
     $cmdArgs = '--task RunScript --runScriptFile "' + $smokeFile + '" --outputFile "' + $smokeOutput + '" --quitAfterExecution'
