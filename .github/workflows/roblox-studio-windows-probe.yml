@@ -1,0 +1,32 @@
+name: Roblox Studio Windows 2025 smoke test
+
+on:
+  push:
+    branches:
+      - experiment/roblox-studio-actions-20261116
+    paths:
+      - .github/workflows/roblox-studio-windows-probe.yml
+      - ci/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  studio-probe:
+    name: Windows 2025 / Roblox Studio RunScript probe
+    runs-on: windows-2025
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Execute the Roblox Studio smoke test
+        shell: pwsh
+        run: ./ci/probe-studio.ps1
+      - name: Upload diagnostics even if the test fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-probe-output
+          path: studio-probe-output/
+          retention-days: 7
+          if-no-files-found: warn
