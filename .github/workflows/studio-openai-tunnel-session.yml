@@ -14,7 +14,7 @@ concurrency:
 jobs:
   studio-tunnel-session:
     name: Windows Studio GUI sign-in and private MCP tunnel
-    runs-on: windows-2025
+    runs-on: windows-2022
     timeout-minutes: 330
     env:
       ROBLOX_USERNAME: ${{ secrets.ROBLOX_USERNAME }}
