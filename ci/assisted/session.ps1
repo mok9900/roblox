@@ -19,16 +19,24 @@ if ($LASTEXITCODE -ne 0) { throw 'Unable to install Windows UI Automation.' }
 Write-Host 'Attempting authorized Roblox GUI sign-in.'
 python .\ci\assisted\login-ui.py
 if ($LASTEXITCODE -ne 0) { throw 'Roblox GUI sign-in not verified (different UI or additional user action needed).' }
-Write-Host 'Opening a fresh unsaved Baseplate place so Studio Assistant/MCP controls become available.'
-python .\ci\assisted\open-test-place-ui.py
-if ($LASTEXITCODE -ne 0) { throw 'Could not open unsaved Baseplate test place after Roblox authentication.' }
+Write-Host 'Opening an isolated local Roblox-owned Baseplate fixture with official Studio EditFile CLI.'
+./ci/assisted/open-test-place-cli.ps1
+if ($LASTEXITCODE -ne 0) { throw 'Could not open local Baseplate test file after Roblox authentication.' }
 Write-Host 'Enabling the Studio MCP toggle through the official UI.'
 python .\ci\assisted\activate-mcp-ui.py
 if ($LASTEXITCODE -ne 0) { throw 'Studio MCP enable control not reachable via UI automation.' }
 $mcpBatch = Join-Path $env:LOCALAPPDATA 'Roblox\mcp.bat'
 if (-not (Test-Path $mcpBatch)) { throw 'Studio MCP launcher not found after GUI activation.' }
-Write-Host 'Launching OpenAI outbound-only Secure MCP Tunnel. No inbound public port opened.'
-Write-Host 'Keep the Actions job running while ChatGPT discovers or calls tools.'
+Write-Host 'Initializing a named OpenAI Secure MCP Tunnel stdio profile.'
+# OpenAI documentation requires init --profile before run --profile.
+# Keep the tunnel runtime API key in the inherited environment, not CLI args.
 $mcpCommand = 'cmd.exe /c "%LOCALAPPDATA%\Roblox\mcp.bat"'
-& $env:TUNNEL_EXE run --mcp-command $mcpCommand --health.listen-addr 127.0.0.1:8080
-if ($LASTEXITCODE -ne 0) { throw 'Tunnel client exited unsuccessfully.' }
+$profileName = 'roblox-studio-ci'
+& $env:TUNNEL_EXE init --sample sample_mcp_stdio_local --profile $profileName --tunnel-id $env:CONTROL_PLANE_TUNNEL_ID --mcp-command $mcpCommand
+if ($LASTEXITCODE -ne 0) { throw 'OpenAI tunnel profile initialization failed.' }
+Write-Host 'Tunnel profile initialized. Running official doctor checks.'
+& $env:TUNNEL_EXE doctor --profile $profileName --explain
+if ($LASTEXITCODE -ne 0) { throw 'OpenAI tunnel doctor check failed.' }
+Write-Host 'TUNNEL_STARTING: OpenAI Secure MCP Tunnel is connecting.'
+& $env:TUNNEL_EXE run --profile $profileName
+if ($LASTEXITCODE -ne 0) { throw 'OpenAI tunnel-client exited unsuccessfully.' }
