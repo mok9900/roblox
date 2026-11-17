@@ -11,3 +11,5 @@ Retry 2026-11-17: after stable Studio install detect unique blue login CTA by DX
 Retry 2026-11-17: WGC post-blue-click screen state and browser process telemetry (no secrets).
 
 Run browser process/UIA diagnostics on 2026-11-17 19:05 KST after guarded WGC+SendInput blue CTA click; no credentials.
+
+2026-11-17 19:09 KST: skip Edge first run via official HideFirstRunExperience; verify Studio blue CTA opens Roblox login instead of Edge welcome.
