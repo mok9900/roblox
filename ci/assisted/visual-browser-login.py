@@ -5,7 +5,7 @@ pages after credentials are entered. Fails closed on unexpected UI structure.
 import os, re, time
 import dxcam, numpy as np, psutil
 from pywinauto import Desktop
-from wgc_sendinput_probe import click_abs, type_unicode
+from wgc_sendinput_probe import click_abs, type_unicode, user32
 
 username=os.environ.get("ROBLOX_USERNAME","")
 password=os.environ.get("ROBLOX_PASSWORD","")
@@ -27,9 +27,13 @@ def windows(exe):
 def blue_cta():
     wins=windows("robloxstudiobeta.exe")
     if len(wins)!=1: raise SystemExit("STUDIO_WINDOW_NOT_UNIQUE")
-    try: wins[0].set_focus()
-    except Exception: pass
+    # Same explicit foreground sequence that passed on both Windows
+    # 2022 and 2025 credential-free WGC+SendInput diagnostic runners.
+    user32.ShowWindow(wins[0].handle, 9)
+    user32.SetForegroundWindow(wins[0].handle)
     time.sleep(.6)
+    if user32.GetForegroundWindow() != wins[0].handle:
+        raise SystemExit("STUDIO_FOCUS_NOT_READY")
     cam=None
     try:
         cam=dxcam.create(backend="dxgi",output_color="RGB",processor_backend="numpy")
@@ -108,7 +112,7 @@ for attempt in range(24):
         break
     except SystemExit as exc:
         if str(exc) not in ("STUDIO_WINDOW_NOT_UNIQUE","STUDIO_GRAPHICS_FRAME_UNAVAILABLE",
-                            "STUDIO_LOGIN_CTA_NOT_UNIQUE"):
+                            "STUDIO_LOGIN_CTA_NOT_UNIQUE","STUDIO_FOCUS_NOT_READY"):
             raise
         if attempt%5==0:
             print("STUDIO_LOGIN_CTA_PENDING: waiting for Studio welcome GUI.",flush=True)
