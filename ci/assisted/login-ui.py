@@ -10,6 +10,8 @@ import os
 import re
 import sys
 import time
+import subprocess
+import psutil
 from pywinauto import Desktop
 
 from otp_relay import wait_for_code
@@ -48,12 +50,21 @@ NAV = frozenset(("file", "view", "test", "model", "파일", "보기", "테스트
 
 
 def windows():
+    # Detect Roblox Studio by actual process, even when its window title only
+    # contains the place name. Keep fallback titles for WebView2 login dialogs.
+    pids = {
+        p.info["pid"] for p in psutil.process_iter(attrs=("pid", "name"))
+        if (p.info.get("name") or "").lower() == "robloxstudiobeta.exe"
+    }
     result = []
     for win in Desktop(backend="uia").windows():
         try:
             title = (win.window_text() or "").lower()
-            if win.is_visible() and any(w in title for w in (
-                "roblox", "login", "log in", "sign in", "verification", "verify", "method", "options", "another", "이메일", "인증",
+            if not win.is_visible():
+                continue
+            if win.element_info.process_id in pids or any(t in title for t in (
+                "roblox", "login", "log in", "sign in", "verification",
+                "verify", "method", "options", "another", "이메일", "인증",
             )):
                 result.append(win)
         except Exception:
@@ -220,9 +231,25 @@ def choose_email():
 
 
 def submit_primary_login():
-    deadline = time.monotonic() + 85
+    began = time.monotonic()
+    deadline = began + 120
+    relaunched = False
+    last_diag = began
     while time.monotonic() < deadline:
         cs = controls()
+        if time.monotonic() - last_diag > 18:
+            print("LOGIN_UI_DIAG: visible_windows=%d edit_fields=%d login_buttons=%d" % (
+                len(windows()),
+                sum(1 for c in cs if ctype(c) == "Edit"),
+                sum(1 for c in cs if ctype(c) == "Button" and LOGIN.fullmatch(label(c))),
+            ), flush=True)
+            last_diag = time.monotonic()
+        if not relaunched and time.monotonic() - began > 25:
+            exe = os.environ.get("STUDIO_EXE")
+            if exe:
+                subprocess.Popen([exe], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                print("LOGIN_GUI_RELAUNCH: explicit Studio launch attempted.", flush=True)
+            relaunched = True
         edits = [c for c in cs if ctype(c) == "Edit"]
         user_fields = [c for c in edits if re.search(r"username|email|phone|사용자 이름|이메일", label(c))]
         pw_fields = [c for c in edits if re.search(r"password|비밀번호", label(c))]
