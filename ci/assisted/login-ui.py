@@ -50,22 +50,20 @@ NAV = frozenset(("file", "view", "test", "model", "파일", "보기", "테스트
 
 
 def windows():
-    # Detect Roblox Studio by actual process, even when its window title only
-    # contains the place name. Keep fallback titles for WebView2 login dialogs.
-    pids = {
-        p.info["pid"] for p in psutil.process_iter(attrs=("pid", "name"))
-        if (p.info.get("name") or "").lower() == "robloxstudiobeta.exe"
-    }
+    # Follow both Roblox Studio and the authorized official Edge browser.
+    # UI names are never used as sources of credential values or arbitrary
+    # secrets. Edge may change its title after a 2FA method menu opens.
     result = []
+    process_names = {
+        p.info["pid"]: (p.info.get("name") or "").lower()
+        for p in psutil.process_iter(attrs=("pid", "name"))
+    }
     for win in Desktop(backend="uia").windows():
         try:
-            title = (win.window_text() or "").lower()
             if not win.is_visible():
                 continue
-            if win.element_info.process_id in pids or any(t in title for t in (
-                "roblox", "login", "log in", "sign in", "verification",
-                "verify", "method", "options", "another", "이메일", "인증",
-            )):
+            exe = process_names.get(win.element_info.process_id, "")
+            if exe in ("robloxstudiobeta.exe", "msedge.exe"):
                 result.append(win)
         except Exception:
             pass
@@ -176,22 +174,40 @@ def enter_code(code):
 
 
 def safe_choice_diagnostics():
-    # Only print generic, non-identifying UI controls. Never log usernames,
-    # email addresses, verification codes, or free-form text containing digits.
-    count = 0
-    terms = ("email", "mail", "method", "way", "code", "option", "verify", "verification",
-             "이메일", "인증", "코드", "방법", "수단", "다른", "alternative")
+    # Only exact, non-identifying Roblox 2FA control names and aggregate
+    # counts. Never print browser URLs, window captions, account data,
+    # email addresses, one-time codes or free-form page text.
+    phrases = re.compile(
+        r"^(?:more options|other options|other methods|other verification methods|"
+        r"try another method|try another way|use another method|"
+        r"choose another way to verify|choose another verification method|"
+        r"email|email code|email me a code|send code to email|"
+        r"send code via email|send email|email verification|"
+        r"verify with email|verify through email|use email|"
+        r"authenticator app|approve on another device|"
+        r"backup code|recovery code|two.step verification|"
+        r"verify|continue|cancel|back|other|"
+        r"다른 방법|다른 인증 수단|다른 방법으로 인증|이메일|"
+        r"이메일로 코드 보내기|이메일 인증|인증 앱|백업 코드|"
+        r"계속|확인|취소)$", re.I
+    )
+    safe = set()
+    kinds = {}
+    e = 0
     for c in controls():
-        n = label(c)
-        if (0 < len(n) < 85 and "@" not in n and
-                re.fullmatch(r"[a-z가-힣 \-?!.]+", n, re.I) and
-                any(k in n for k in terms) and
-                ctype(c) in ("Button", "Hyperlink", "MenuItem", "RadioButton", "TabItem", "ListItem", "Text", "Custom")):
-            print(f"SAFE_UIA_OPTION: {ctype(c)} | {n}", flush=True)
-            count += 1
-            if count >= 18:
-                break
-    print(f"SAFE_UIA_OPTION_COUNT: {count}", flush=True)
+        typ = ctype(c)
+        if typ in ("Button","Hyperlink","MenuItem","RadioButton","TabItem","ListItem","Text","Custom"):
+            kinds[typ] = kinds.get(typ, 0) + 1
+            n = label(c)
+            if phrases.fullmatch(n):
+                safe.add(f"{typ}:{n}")
+        elif typ == "Edit":
+            e += 1
+    print("SAFE_2FA_UI: " + ", ".join(sorted(safe)[:32]), flush=True)
+    print("SAFE_2FA_UI_COUNTS: edits=%d menuitems=%d radios=%d listitems=%d buttons=%d texts=%d" % (
+        e,kinds.get("MenuItem",0),kinds.get("RadioButton",0),
+        kinds.get("ListItem",0),kinds.get("Button",0),kinds.get("Text",0)
+    ),flush=True)
 
 
 def choose_email():
@@ -223,7 +239,7 @@ def choose_email():
         if not alternatives_opened and click_button(cs, OTHER_CONTROL):
             alternatives_opened = True
             print("EMAIL_FALLBACK_OPENED_ALTERNATIVE_METHODS.", flush=True)
-            time.sleep(2)
+            time.sleep(4)
             safe_choice_diagnostics()
         time.sleep(2)
     safe_choice_diagnostics()
