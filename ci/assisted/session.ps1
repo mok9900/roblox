@@ -14,7 +14,7 @@ if ($active.Count -eq 0) {
     Start-Process -FilePath $env:STUDIO_EXE | Out-Null
 }
 Write-Host 'Installing Windows UI Automation'
-python -m pip install --disable-pip-version-check --quiet 'pywinauto==0.6.9'
+python -m pip install --disable-pip-version-check --quiet 'pywinauto==0.6.9' 'psutil>=6.1,<8'
 if ($LASTEXITCODE -ne 0) { throw 'Unable to install Windows UI Automation.' }
 Write-Host 'Attempting authorized Roblox GUI sign-in.'
 python .\ci\assisted\login-ui.py
