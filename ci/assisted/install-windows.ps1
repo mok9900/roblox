@@ -22,14 +22,18 @@ if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notm
 }
 $existing = Get-StudioExe
 if (-not $existing) {
-    Start-Process -FilePath $installer | Out-Null
-    $deadline = (Get-Date).AddMinutes(5)
+    $installerProc = Start-Process -FilePath $installer -PassThru
+    Write-Host 'STUDIO_INSTALLER_LAUNCHED: waiting for executable then full content extraction.'
+    $deadline = (Get-Date).AddMinutes(6)
     while (-not $existing -and (Get-Date) -lt $deadline) {
         Start-Sleep -Seconds 3
         $existing = Get-StudioExe
     }
 }
 if (-not $existing) { throw 'Roblox Studio executable not detected after installation.' }
+Write-Host 'STUDIO_EXE_FOUND_BUT_INSTALL_NOT_YET_VERIFIED: checking full installation assets.'
+& ./ci/assisted/verify-studio-install.ps1 -StudioPath $existing.FullName -TimeoutSeconds 420
+if ($LASTEXITCODE -ne 0) { throw 'Roblox Studio full installation validation failed.' }
 $envFile = $env:GITHUB_ENV
 "STUDIO_EXE=$($existing.FullName)" | Out-File -FilePath $envFile -Encoding utf8 -Append
 Write-Host 'Roblox Studio executable found. (Path saved to GITHUB_ENV)'
