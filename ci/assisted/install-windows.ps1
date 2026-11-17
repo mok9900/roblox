@@ -34,7 +34,9 @@ $envFile = $env:GITHUB_ENV
 "STUDIO_EXE=$($existing.FullName)" | Out-File -FilePath $envFile -Encoding utf8 -Append
 Write-Host 'Roblox Studio executable found. (Path saved to GITHUB_ENV)'
 Write-Host '[2/2] Downloading signed-release-checksum-verified OpenAI tunnel-client'
-$release = Invoke-RestMethod -Uri 'https://api.github.com/repos/openai/tunnel-client/releases/latest' -Headers @{ 'User-Agent' = 'roblox-studio-actions' }
+$gitHeaders = @{ 'User-Agent' = 'roblox-studio-actions'; 'Accept' = 'application/vnd.github+json' }
+if ($env:GH_TOKEN) { $gitHeaders['Authorization'] = "Bearer $env:GH_TOKEN" }
+$release = Invoke-RestMethod -Uri 'https://api.github.com/repos/openai/tunnel-client/releases/latest' -Headers $gitHeaders
 $arch = [Environment]::Is64BitOperatingSystem
 if (-not $arch) { throw 'This runner must be x64.' }
 $target = @($release.assets | Where-Object { $_.name -match '^tunnel-client-v[0-9].*-windows-amd64[.]zip$' } | Select-Object -First 1)
