@@ -270,60 +270,78 @@ def studio_counts():
 
 def studio_button_probe_and_safe_click(visual_capture_usable: bool) -> dict:
     """
-    SendInput click ONLY a unique accessible Roblox 'Log In' button.
-    No usernames/passwords/OTP data are loaded in this test workflow.
-    Never click generic OK/Cancel/Continue or guess screen coordinates.
+    On a no-credentials ephemeral Studio runner, use SendInput ONLY against
+    uniquely identified, accessible Log In or benign OK buttons. No blind
+    clicking, no credential or OTP insertion, no existing game modification.
     """
     import re
     import psutil
     from pywinauto import Desktop
     report = {
         "studio_button_labels_safe": [],
-        "login_button_candidates": 0,
-        "sendinput_login_button_clicked": False,
+        "studio_safe_error_text_hints": [],
+        "button_clicked": None,
         "login_edit_fields_after_click": None,
         "error_kind": None,
     }
+    if os.environ.get("ROBLOX_PASSWORD") or os.environ.get("ROBLOX_USERNAME"):
+        report["error_kind"] = "CredentialsPresentRefusingDiagnostic"
+        return report
     pids = {p.info["pid"] for p in psutil.process_iter(attrs=("pid", "name"))
             if (p.info.get("name") or "").lower() == "robloxstudiobeta.exe"}
-    match = re.compile(r"^(?:log in|login|sign in|sign-in|login to studio|log in to studio|"
+    login = re.compile(r"^(?:log in|login|sign in|sign-in|login to studio|log in to studio|"
                        r"sign in to roblox studio|sign in with browser|로그인|계정 로그인)$", re.I)
-    allowed_safe = re.compile(r"^[a-zA-Z가-힣 \-]{1,46}$")
-    candidates = []
+    safe_name = re.compile(r"^[a-zA-Z가-힣 \-]{1,50}$")
+    maybe_error = re.compile(r"(?:error|failed|unable|studio|connect|internet|network|"
+                             r"update|install|authentication|문제|오류|실패|연결|업데이트|설치)", re.I)
+    found = []
     try:
         for win in Desktop(backend="uia").windows():
             if not win.is_visible() or win.element_info.process_id not in pids:
                 continue
-            for c in win.descendants():
-                if not c.is_visible() or c.element_info.control_type != "Button":
+            for control in win.descendants():
+                if not control.is_visible():
                     continue
-                label = (c.element_info.name or "").strip()
-                if allowed_safe.fullmatch(label) and "@" not in label:
-                    # Safe by design: no credentials or user-specific app data exist in this job.
-                    report["studio_button_labels_safe"].append(label)
-                if match.fullmatch(label):
-                    candidates.append((win, c))
-        report["studio_button_labels_safe"] = sorted(set(report["studio_button_labels_safe"]))[:12]
-        report["login_button_candidates"] = len(candidates)
-        if not visual_capture_usable or len(candidates) != 1:
+                kind = control.element_info.control_type
+                label = (control.element_info.name or "").strip()
+                if kind == "Text" and safe_name.fullmatch(label) and maybe_error.search(label):
+                    report["studio_safe_error_text_hints"].append(label)
+                if kind == "Button":
+                    if safe_name.fullmatch(label):
+                        report["studio_button_labels_safe"].append(label)
+                    found.append((win, control, label))
+        labels = sorted(set(report["studio_button_labels_safe"]))
+        report["studio_button_labels_safe"] = labels[:12]
+        report["studio_safe_error_text_hints"] = sorted(set(report["studio_safe_error_text_hints"]))[:8]
+        if not visual_capture_usable:
             return report
-        win, button = candidates[0]
-        rect = button.rectangle()
+        logins = [(w, c, "Log In") for w, c, lab in found if login.fullmatch(lab)]
+        oks = [(w, c, "OK") for w, c, lab in found if lab.lower() == "ok"]
+        # Do not click OK unless exactly the two Studio controls seen here are
+        # "Close" and "OK": this is a bounded startup modal on an empty CI runner.
+        if len(logins) == 1:
+            candidate = logins[0]
+        elif len(oks) == 1 and set(labels) == {"Close", "OK"} and len(found) == 2:
+            candidate = oks[0]
+        else:
+            return report
+        win, control, action = candidate
+        rect = control.rectangle()
         wr = wintypes.RECT()
         if not user32.GetWindowRect(win.handle, ct.byref(wr)):
             raise RuntimeError("Studio window rectangle unavailable")
         cx = (rect.left + rect.right) // 2
         cy = (rect.top + rect.bottom) // 2
         if not (wr.left <= cx < wr.right and wr.top <= cy < wr.bottom):
-            raise RuntimeError("Login button rect not inside Studio window")
+            raise RuntimeError("Target button rectangle not within Studio window")
         user32.ShowWindow(win.handle, 9)
         user32.SetForegroundWindow(win.handle)
         time.sleep(0.4)
         if user32.GetForegroundWindow() != win.handle:
-            raise RuntimeError("Studio window did not have foreground")
+            raise RuntimeError("Studio window not in foreground")
         click_abs(cx, cy)
-        report["sendinput_login_button_clicked"] = True
-        time.sleep(6)
+        report["button_clicked"] = action
+        time.sleep(7)
         report["login_edit_fields_after_click"] = studio_counts()["studio_edit_controls"]
     except Exception as exc:
         report["error_kind"] = type(exc).__name__
