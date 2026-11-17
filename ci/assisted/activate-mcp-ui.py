@@ -9,13 +9,19 @@ Does not read usernames, email, secrets, page contents or take screenshots.
 import re
 import time
 from pywinauto import Desktop
+import psutil
 
 def get_controls():
+    # Studio's editor windows may be titled only with the local place name.
+    # Identify the process instead of relying on window title substrings.
+    pids = {
+        p.info["pid"] for p in psutil.process_iter(attrs=("pid", "name"))
+        if (p.info.get("name") or "").lower() == "robloxstudiobeta.exe"
+    }
     out = []
     for win in Desktop(backend="uia").windows():
         try:
-            title = (win.window_text() or "").lower()
-            if not win.is_visible() or not any(t in title for t in ("roblox", "studio")):
+            if not win.is_visible() or win.element_info.process_id not in pids:
                 continue
             out.extend(c for c in win.descendants() if c.is_visible())
         except Exception:
