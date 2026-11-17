@@ -268,6 +268,68 @@ def studio_counts():
     return counts
 
 
+def studio_button_probe_and_safe_click(visual_capture_usable: bool) -> dict:
+    """
+    SendInput click ONLY a unique accessible Roblox 'Log In' button.
+    No usernames/passwords/OTP data are loaded in this test workflow.
+    Never click generic OK/Cancel/Continue or guess screen coordinates.
+    """
+    import re
+    import psutil
+    from pywinauto import Desktop
+    report = {
+        "studio_button_labels_safe": [],
+        "login_button_candidates": 0,
+        "sendinput_login_button_clicked": False,
+        "login_edit_fields_after_click": None,
+        "error_kind": None,
+    }
+    pids = {p.info["pid"] for p in psutil.process_iter(attrs=("pid", "name"))
+            if (p.info.get("name") or "").lower() == "robloxstudiobeta.exe"}
+    match = re.compile(r"^(?:log in|login|sign in|sign-in|login to studio|log in to studio|"
+                       r"sign in to roblox studio|sign in with browser|로그인|계정 로그인)$", re.I)
+    allowed_safe = re.compile(r"^[a-zA-Z가-힣 \-]{1,46}$")
+    candidates = []
+    try:
+        for win in Desktop(backend="uia").windows():
+            if not win.is_visible() or win.element_info.process_id not in pids:
+                continue
+            for c in win.descendants():
+                if not c.is_visible() or c.element_info.control_type != "Button":
+                    continue
+                label = (c.element_info.name or "").strip()
+                if allowed_safe.fullmatch(label) and "@" not in label:
+                    # Safe by design: no credentials or user-specific app data exist in this job.
+                    report["studio_button_labels_safe"].append(label)
+                if match.fullmatch(label):
+                    candidates.append((win, c))
+        report["studio_button_labels_safe"] = sorted(set(report["studio_button_labels_safe"]))[:12]
+        report["login_button_candidates"] = len(candidates)
+        if not visual_capture_usable or len(candidates) != 1:
+            return report
+        win, button = candidates[0]
+        rect = button.rectangle()
+        wr = wintypes.RECT()
+        if not user32.GetWindowRect(win.handle, ct.byref(wr)):
+            raise RuntimeError("Studio window rectangle unavailable")
+        cx = (rect.left + rect.right) // 2
+        cy = (rect.top + rect.bottom) // 2
+        if not (wr.left <= cx < wr.right and wr.top <= cy < wr.bottom):
+            raise RuntimeError("Login button rect not inside Studio window")
+        user32.ShowWindow(win.handle, 9)
+        user32.SetForegroundWindow(win.handle)
+        time.sleep(0.4)
+        if user32.GetForegroundWindow() != win.handle:
+            raise RuntimeError("Studio window did not have foreground")
+        click_abs(cx, cy)
+        report["sendinput_login_button_clicked"] = True
+        time.sleep(6)
+        report["login_edit_fields_after_click"] = studio_counts()["studio_edit_controls"]
+    except Exception as exc:
+        report["error_kind"] = type(exc).__name__
+    return report
+
+
 def main(phase):
     report = {
         "phase": phase,
@@ -286,6 +348,11 @@ def main(phase):
         time.sleep(14)
         report["studio_after"] = studio_counts()
     report["capture"] = capture_safe(phase)
+    if phase == "studio":
+        visual_ok = any(x.get("usable") for x in report["capture"] if x["backend"] in ("dxgi", "winrt"))
+        report["studio_login_button_pilot"] = studio_button_probe_and_safe_click(visual_ok)
+        if report["studio_login_button_pilot"]["sendinput_login_button_clicked"]:
+            report["capture_after_click"] = capture_safe("studio_after_safe_login_click")
     path = EXPORT / f"{phase}_report.json"
     path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print("SAFE_GRAPHICS_PROBE_RESULT=" + json.dumps(report, separators=(",", ":")), flush=True)
