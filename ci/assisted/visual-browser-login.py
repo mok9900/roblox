@@ -115,7 +115,7 @@ for attempt in range(24):
                             "STUDIO_LOGIN_CTA_NOT_UNIQUE","STUDIO_FOCUS_NOT_READY"):
             raise
         if attempt%5==0:
-            print("STUDIO_LOGIN_CTA_PENDING: waiting for Studio welcome GUI.",flush=True)
+            print("STUDIO_LOGIN_CTA_PENDING: " + str(exc),flush=True)
         time.sleep(3)
 if not cta_ready:
     raise SystemExit("STUDIO_LOGIN_CTA_TIMEOUT: safe visual target never appeared")
