@@ -73,17 +73,22 @@ def browser_form():
         try:
             if "roblox" not in (win.window_text() or "").lower(): continue
             wr=win.rectangle()
-            edits=[]
+            users=[]; passwords=[]
             for c in win.descendants():
                 if not c.is_visible() or c.element_info.control_type!="Edit": continue
                 r=c.rectangle(); x=(r.left+r.right)/2; y=(r.top+r.bottom)/2
-                if (wr.left+wr.width()*.18<x<wr.left+wr.width()*.82
-                    and wr.top+110<y<wr.top+wr.height()*.77
+                if not (wr.left+wr.width()*.18<x<wr.left+wr.width()*.82
+                    and wr.top+110<y<wr.top+wr.height()*.83
                     and r.width()>=160 and r.height()>=18):
-                    edits.append(c)
-            edits.sort(key=lambda c:c.rectangle().top)
-            if len(edits)!=2 or edits[1].rectangle().top<=edits[0].rectangle().bottom: continue
-            seen.append((win,edits))
+                    continue
+                label=(c.element_info.name or "").strip().lower()
+                if re.search(r"username|user name|email|phone|사용자|이메일",label):
+                    users.append(c)
+                if re.search(r"password|비밀번호",label):
+                    passwords.append(c)
+            if len(users)!=1 or len(passwords)!=1: continue
+            if passwords[0].rectangle().top<=users[0].rectangle().bottom: continue
+            seen.append((win,[users[0],passwords[0]]))
         except Exception:
             continue
     return seen[0] if len(seen)==1 else None
