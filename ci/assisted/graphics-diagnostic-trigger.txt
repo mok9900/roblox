@@ -2,3 +2,4 @@ Run safe WGC / Desktop Duplication / SendInput diagnostic on 2026-11-17.
 This trigger has no account credentials or OTP contents.
 Retry 2026-11-17: print safe library exception hints and compare diagnostic GDI capture.
 Retry 2026-11-17: fix DXcam 0.2.0 manual release and verify real DXGI/WGC frames.
+Retry 2026-11-17: WGC-guided guarded SendInput click for unique accessible Roblox Sign In button without credentials.
