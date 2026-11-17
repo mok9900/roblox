@@ -142,3 +142,13 @@ Follow-up: https://github.com/mok9900/roblox/actions/runs/44046204082
 - **Next blocker:** inspect the browser's foreground process and non-sensitive UIA controls in the opened window, handle Edge first-run if it is shown, then validate a credential-secure login flow before reconnecting the existing Gmail OTP automation. No verified MCP/tunnel handshake yet.
 
 Keep the CI diagnostic workflow separate from the credential-bearing session workflow until interactive login screen contents and target inputs can be identified safely. Never send SendInput into arbitrary screen coordinates on a credential-bearing runner.
+
+## November 17 (late KST): primary browser login reproduced; 2FA method selection pending
+
+- Action run: https://github.com/mok9900/roblox/actions/runs/44095190257 (completed, failure at challenge method selection).
+- WGC-driven Studio blue login CTA activated. The official Roblox login form in Edge exposed a unique username/password pair and accepted the login form submission. This is evidence of **primary credentials submitted**, not proof of a completed session.
+- After the mobile-app approval window, the Roblox challenge's `More Options` control was activated. A privacy-restricted UIA diagnostic reported exactly three generic `MenuItem` nodes, zero matching email method choices, and no newly received Roblox email OTP.
+- No email OTP was entered in this run. The local Baseplate editor, Studio MCP, and OpenAI Secure MCP Tunnel were not reached.
+- The diagnostic intentionally did not log browser URLs, account names, OTPs or unredacted screenshots.
+- A proposed automatic 2FA menu-selection edit was **not applied** because the GitHub action rejected the attempted update; keep the existing code and security boundary unchanged until a supported verification approach is available.
+- The optional next step is user-approved interactive verification through Roblox's official login challenge UI, followed by the already-scripted local Place open and MCP activation. Do not randomly choose the three unidentified menu entries or request secret codes in issue comments.
