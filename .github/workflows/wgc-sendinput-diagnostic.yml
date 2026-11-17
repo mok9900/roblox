@@ -41,6 +41,11 @@ jobs:
         run: |
           python .\ci\assisted\wgc_sendinput_probe.py --phase studio
           if ($LASTEXITCODE -ne 0) { throw 'Studio frame probe failed.' }
+      - name: Inspect credential-free browser UI opened after visual Studio click
+        shell: pwsh
+        run: |
+          python .\ci\assisted\inspect-browser-ui.py
+          if ($LASTEXITCODE -ne 0) { throw 'Safe browser inspection failed.' }
       - name: Upload safe, irreversibly pixelated diagnostic thumbnails only
         if: always()
         uses: actions/upload-artifact@v4
