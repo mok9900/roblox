@@ -369,7 +369,7 @@ def main(phase):
     if phase == "studio":
         visual_ok = any(x.get("usable") for x in report["capture"] if x["backend"] in ("dxgi", "winrt"))
         report["studio_login_button_pilot"] = studio_button_probe_and_safe_click(visual_ok)
-        if report["studio_login_button_pilot"]["sendinput_login_button_clicked"]:
+        if report["studio_login_button_pilot"]["button_clicked"] is not None:
             report["capture_after_click"] = capture_safe("studio_after_safe_login_click")
     path = EXPORT / f"{phase}_report.json"
     path.write_text(json.dumps(report, indent=2), encoding="utf-8")
