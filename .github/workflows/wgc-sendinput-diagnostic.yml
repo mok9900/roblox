@@ -1,0 +1,51 @@
+name: WGC-DXGI + SendInput GUI diagnostics (no credentials)
+on:
+  push:
+    branches:
+      - feature/studio-openai-tunnel-assisted
+    paths:
+      - ci/assisted/graphics-diagnostic-trigger.txt
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-graphics:
+    name: Safe desktop diagnostics on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-2022
+          - windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install screen capture and Windows input dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --quiet 'dxcam[winrt]==0.2.0' 'Pillow>=11,<13' 'psutil>=6.1,<8' 'pywinauto==0.6.9'
+          if ($LASTEXITCODE -ne 0) { throw 'GUI diagnostic package installation failed.' }
+      - name: Test Desktop Duplication / Windows Graphics Capture + safe SendInput
+        shell: pwsh
+        run: |
+          python .\ci\assisted\wgc_sendinput_probe.py --phase safe
+          if ($LASTEXITCODE -ne 0) { throw 'Safe capture/SendInput probe failed.' }
+      - name: Install signed Studio (does not use Roblox credentials)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./ci/assisted/install-windows.ps1
+      - name: Capture privacy-reduced Studio GUI shape
+        shell: pwsh
+        run: |
+          python .\ci\assisted\wgc_sendinput_probe.py --phase studio
+          if ($LASTEXITCODE -ne 0) { throw 'Studio frame probe failed.' }
+      - name: Upload safe, irreversibly pixelated diagnostic thumbnails only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-shape-${{ matrix.os }}
+          path: ci/assisted/.runtime/safe-graphics/*
+          if-no-files-found: warn
+          retention-days: 1
