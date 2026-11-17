@@ -31,6 +31,8 @@ jobs:
           Write-Host 'Required secrets exist.'
       - name: Install Studio and official OpenAI tunnel client
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./ci/assisted/install-windows.ps1
       - name: Generate one-time OTP relay key for this specific run
         shell: pwsh
