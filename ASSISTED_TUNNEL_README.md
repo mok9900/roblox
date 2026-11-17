@@ -78,3 +78,32 @@ https://developers.openai.com/api/docs/guides/custom-mcp-server
 - The temporary encrypted OTP relay text files for these completed runs were removed from the active branch. The historical git objects remain ciphertext only.
 
 **Current next issue:** Open an unsaved Roblox Studio place reliably after GUI sign-in in an unattended Windows 2025 GitHub-hosted runner. Studio Assistant and its built-in MCP settings only show with an editor/place open. After solving this, validate Assistant → Settings → MCP Servers → Enable Studio as MCP server, followed by tunnel-client connectivity and list_roblox_studios handshake.
+
+## Windows runner GUI + local Place CLI experiment (2026-11-17)
+
+**Official source references:**
+- https://create.roblox.com/docs/studio/cli
+- https://create.roblox.com/docs/studio/mcp
+- https://developers.openai.com/api/docs/guides/secure-mcp-tunnels
+- https://github.com/Roblox/rbx-test-files/tree/91182f4016e67a8d162fc41176a9ae3275463fd1/places/baseplate-413
+
+**Run 7** https://github.com/mok9900/roblox/actions/runs/44007843463
+- Roblox Studio installer/executable detected. OpenAI tunnel-client GitHub release lookup failed because of anonymous GitHub API rate limiting.
+- Fixed by supplying GitHub Actions scoped GH_TOKEN to the release lookup.
+**Run 8** https://github.com/mok9900/roblox/actions/runs/44007984817
+- Both binaries installed and release checksum verified; login UI never became accessible within 85 seconds.
+**Run 9** https://github.com/mok9900/roblox/actions/runs/44008551568
+- GUI process-aware login probe needed psutil on the Windows Runner; added pip installation.
+**Run 10** https://github.com/mok9900/roblox/actions/runs/44008901218
+- Windows 2025: Roblox Studio processes and windows were visible, but UIA reported zero editable login fields even after explicitly launching the Studio GUI a second time.
+**Run 11** https://github.com/mok9900/roblox/actions/runs/44009548446
+- Windows 2025: Roblox-owned pinned local RBXLX sample downloaded, XML structurally checked and SHA256 reported (B090B0F931B48B28584279DFBAEF11327148860A27F48A20A042127E9A139ACB).
+- Official Studio --task EditFile --localPlaceFile was invoked successfully, *before* authentication, but the editor itself was not confirmed.
+- GUI login still reported zero editable controls across three visible Studio windows.
+**Run 12** https://github.com/mok9900/roblox/actions/runs/44010102030
+- Tested same pipeline on officially supported GitHub-hosted Windows Server 2022.
+- Same outcome as Windows 2025: pinned local test Place downloaded and EditFile launch issued; GUI login fields were inaccessible (three Studio windows, no editable controls).
+
+**Precise current status:** Legacy Nov 16 runs 5 and 6 proved that Gmail OTP automation can sign into Roblox Studio. This does *not* mean the login flow is stable on current GitHub Actions runner images. On Nov 17, repeat tests on Windows 2025 and 2022 encountered inaccessible GUI login controls, and no new email OTP was submitted. CLI invocation does not prove a Place editor loaded. The MCP toggle, OpenAI Tunnel client connection, and ChatGPT list_roblox_studios handshake remain **unverified**. No active tunnel session currently exists.
+
+**Next directions:** instrument WebView2/GUI accessibility through sanitized, credential-free diagnostics; investigate a proper interactive Windows session/remote desktop to confirm what is on screen; avoid blind password entry or repeated login attempts; after GUI login loads, verify local EditFile/editor signal, Studio Assistant MCP toggle, profile-based tunnel setup and a live list_roblox_studios call. Only the last successful call establishes end-to-end completion.
