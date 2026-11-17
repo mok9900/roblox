@@ -268,6 +268,42 @@ def studio_counts():
     return counts
 
 
+def capture_only_ci_pre_auth_modal() -> dict:
+    """
+    Capture ONLY the centered startup OK dialog, on this dedicated test job
+    with no Roblox username/password/OTP secrets present. This intentionally
+    uses full resolution exclusively for the small startup ERROR dialog, not
+    any authentication page or complete desktop. Artifact retention: 1 day.
+    """
+    result = {"saved": False, "error_kind": None}
+    if any(os.environ.get(v) for v in ("ROBLOX_USERNAME", "ROBLOX_PASSWORD", "CONTROL_PLANE_API_KEY")):
+        result["error_kind"] = "SecretPresentCaptureRefused"
+        return result
+    try:
+        import dxcam
+        from PIL import Image
+        import numpy as np
+        cam = dxcam.create(backend="dxgi", processor_backend="numpy", output_color="RGB")
+        try:
+            frame = cam.grab(new_frame_only=False)
+            if frame is None:
+                raise RuntimeError("No desktop frame")
+            img = Image.fromarray(np.asarray(frame).astype("uint8"), mode="RGB")
+            w, h = img.size
+            # Captures only the central Studio startup popup, excludes the
+            # taskbar, browser/email UI and other unrelated desktop regions.
+            crop = img.crop((int(w * .28), int(h * .30), int(w * .72), int(h * .68)))
+            out = EXPORT / "studio_pre_auth_startup_modal_only.jpg"
+            crop.save(out, quality=83)
+            result["saved"] = True
+            result["size"] = list(crop.size)
+        finally:
+            cam.release()
+    except Exception as exc:
+        result["error_kind"] = type(exc).__name__
+    return result
+
+
 def studio_button_probe_and_safe_click(visual_capture_usable: bool) -> dict:
     """
     On a no-credentials ephemeral Studio runner, use SendInput ONLY against
@@ -315,6 +351,8 @@ def studio_button_probe_and_safe_click(visual_capture_usable: bool) -> dict:
         report["studio_safe_error_text_hints"] = sorted(set(report["studio_safe_error_text_hints"]))[:8]
         if not visual_capture_usable:
             return report
+        if set(labels) == {"Close", "OK"} and len(found) == 2:
+            report["nonsecret_startup_modal_crop"] = capture_only_ci_pre_auth_modal()
         logins = [(w, c, "Log In") for w, c, lab in found if login.fullmatch(lab)]
         oks = [(w, c, "OK") for w, c, lab in found if lab.lower() == "ok"]
         # Do not click OK unless exactly the two Studio controls seen here are
@@ -341,8 +379,9 @@ def studio_button_probe_and_safe_click(visual_capture_usable: bool) -> dict:
             raise RuntimeError("Studio window not in foreground")
         click_abs(cx, cy)
         report["button_clicked"] = action
-        time.sleep(7)
-        report["login_edit_fields_after_click"] = studio_counts()["studio_edit_controls"]
+        time.sleep(22)
+        report["studio_state_after_click"] = studio_counts()
+        report["login_edit_fields_after_click"] = report["studio_state_after_click"]["studio_edit_controls"]
     except Exception as exc:
         report["error_kind"] = type(exc).__name__
     return report
