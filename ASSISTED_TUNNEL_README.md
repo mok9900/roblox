@@ -107,3 +107,23 @@ https://developers.openai.com/api/docs/guides/custom-mcp-server
 **Precise current status:** Legacy Nov 16 runs 5 and 6 proved that Gmail OTP automation can sign into Roblox Studio. This does *not* mean the login flow is stable on current GitHub Actions runner images. On Nov 17, repeat tests on Windows 2025 and 2022 encountered inaccessible GUI login controls, and no new email OTP was submitted. CLI invocation does not prove a Place editor loaded. The MCP toggle, OpenAI Tunnel client connection, and ChatGPT list_roblox_studios handshake remain **unverified**. No active tunnel session currently exists.
 
 **Next directions:** instrument WebView2/GUI accessibility through sanitized, credential-free diagnostics; investigate a proper interactive Windows session/remote desktop to confirm what is on screen; avoid blind password entry or repeated login attempts; after GUI login loads, verify local EditFile/editor signal, Studio Assistant MCP toggle, profile-based tunnel setup and a live list_roblox_studios call. Only the last successful call establishes end-to-end completion.
+
+## WGC / DXGI Desktop Duplication / SendInput diagnostics — November 17, 2026
+
+- Both official Windows 2022 and 2025 hosted runners have 1024x768 interactive desktops. Real Win32 SendInput mouse button events and Unicode keystrokes succeeded when tested against a purpose-built, non-sensitive Tk window.
+- The DXcam 0.2.0 package's DXCamera lacks the context-manager protocol; using manual camera.release() fixed the initial TypeError. Both DXGI Desktop Duplication and WinRT Windows.Graphics.Capture subsequently returned nonblank 1024x768 frames in both runner environments.
+- Studio presented a native startup modal with buttons Close/OK and an on-screen error: "Some Studio files are missing or corrupted. Please reinstall Studio." WGC-cropped screenshot was captured only in a no-credentials diagnostic workflow. SendInput successfully clicked OK; the error quit Roblox Studio.
+- Root-cause investigation found the original installer returned as soon as RobloxStudioBeta.exe appeared, before the installer completed extracting assets. The fix now waits for stable file tree, content directory, minimum size and file count, and installer-process termination.
+- Updated full installation had 19,294 files, about 1.09GB, and all verification stability checks passing; the damaged-install modal disappeared.
+- Studio's installed welcome/login UI appeared but its embedded controls were not reachable as UIA Edit controls. DXGI pixel inspection identified a unique blue 287x40 login-style CTA on both Windows 2022 and 2025. A foreground-validated native SendInput mouse click to that rectangle succeeded on both. This was a **credential-free proof-of-concept**, not yet a verified Roblox account sign-in.
+- Credential-bearing production workflow is not enabled with these new pixel-click controls until post-click navigation and login/OTP controls are verified. Do not upload full-res auth screens or store OTP/Roblox passwords in the public repo.
+
+Evidence:
+- Original validation: https://github.com/mok9900/roblox/actions/runs/44041844655
+- Capture bug diagnosis: https://github.com/mok9900/roblox/actions/runs/44042248957
+- WGC/DXGI capture success: https://github.com/mok9900/roblox/actions/runs/44042606635
+- Native modal OK SendInput experiment: https://github.com/mok9900/roblox/actions/runs/44043790768
+- Fixed full-install verification: https://github.com/mok9900/roblox/actions/runs/44044967196
+- Guarded DXGI blue CTA + SendInput click: https://github.com/mok9900/roblox/actions/runs/44045654996
+
+Next: determine whether the button opens an external WebView/browser or changes the Studio startup view; then integrate a well-scoped visual input fallback into the assistant-connected session workflow, preserving verified Gmail 2FA and the no-secrets diagnostic safety boundary.
