@@ -182,52 +182,51 @@ def test_sendinput() -> dict:
 
 
 def capture_safe(phase: str):
-    from PIL import Image
+    from PIL import Image, ImageGrab
     import numpy as np
     import dxcam
     result = []
     for backend in ("dxgi", "winrt"):
         report = {"backend": backend, "usable": False, "nonblank": False, "error_kind": None}
+        cam = None
         try:
-            with dxcam.create(backend=backend, output_color="RGB", processor_backend="numpy") as cam:
-                image = None
-                for _ in range(10):
-                    image = cam.grab(new_frame_only=False)
-                    if image is not None:
-                        break
-                    time.sleep(0.3)
-                if image is None:
-                    raise RuntimeError("No new frame returned")
-                img = np.asarray(image)
-                report["usable"] = True
-                report["height"] = int(img.shape[0])
-                report["width"] = int(img.shape[1])
-                report["stddev"] = round(float(img.std()), 1)
-                report["nonblank"] = report["stddev"] > 2.0
-                # Aggressively irreversible downsampling. Text, OTPs, usernames
-                # and fine UI detail are NOT preserved or ever written to disk.
-                thumb = Image.fromarray(img.astype("uint8"), mode="RGB").resize(
-                    (48, 27), Image.Resampling.BOX
-                ).resize((480, 270), Image.Resampling.NEAREST)
-                # No full-resolution screenshots are retained.
-                out = EXPORT / f"{phase}_{backend}_redacted.png"
-                thumb.save(out)
-                report["redacted_artifact"] = out.name
+            # dxcam 0.2.0 provides release(), but does not support "with" contexts.
+            cam = dxcam.create(backend=backend, output_color="RGB", processor_backend="numpy")
+            image = None
+            for _ in range(10):
+                image = cam.grab(new_frame_only=False)
+                if image is not None:
+                    break
+                time.sleep(0.3)
+            if image is None:
+                raise RuntimeError("No new frame returned")
+            img = np.asarray(image)
+            report["usable"] = True
+            report["height"] = int(img.shape[0])
+            report["width"] = int(img.shape[1])
+            report["stddev"] = round(float(img.std()), 1)
+            report["nonblank"] = report["stddev"] > 2.0
+            # Text and fine UI details are irreversibly discarded.
+            thumb = Image.fromarray(img.astype("uint8"), mode="RGB").resize(
+                (48, 27), Image.Resampling.BOX
+            ).resize((480, 270), Image.Resampling.NEAREST)
+            out = EXPORT / f"{phase}_{backend}_redacted.png"
+            thumb.save(out)
+            report["redacted_artifact"] = out.name
         except Exception as exc:
             report["error_kind"] = type(exc).__name__
-            # No Roblox account secrets are provided to this diagnostic workflow.
-            # Library's short exception type/message identifies API incompatibility.
-            hint = str(exc).replace("\\n", " ")
-            if len(hint) > 190:
-                hint = hint[:190] + "..."
-            report["capture_error_hint"] = hint
+            report["capture_error_hint"] = str(exc).replace("\n", " ")[:190]
+        finally:
+            if cam is not None:
+                try:
+                    cam.release()
+                except Exception:
+                    pass
         result.append(report)
 
-    # Separate, non-DXGI fallback ONLY for differentiating desktop lock
-    # from a DXcam/COM library incompatibility. Not counted as WGC/DXGI success.
+    # Diagnostic GDI comparison; never claim that this is WGC/DXGI.
     gdi = {"backend": "gdi-diagnostic-only", "usable": False, "error_kind": None}
     try:
-        from PIL import ImageGrab
         raw = ImageGrab.grab(all_screens=False)
         gdi["usable"] = True
         gdi["width"], gdi["height"] = raw.size
