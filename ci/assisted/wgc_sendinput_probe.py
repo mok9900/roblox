@@ -215,8 +215,32 @@ def capture_safe(phase: str):
                 report["redacted_artifact"] = out.name
         except Exception as exc:
             report["error_kind"] = type(exc).__name__
-            # Never log exception strings containing desktop data or user paths.
+            # No Roblox account secrets are provided to this diagnostic workflow.
+            # Library's short exception type/message identifies API incompatibility.
+            hint = str(exc).replace("\\n", " ")
+            if len(hint) > 190:
+                hint = hint[:190] + "..."
+            report["capture_error_hint"] = hint
         result.append(report)
+
+    # Separate, non-DXGI fallback ONLY for differentiating desktop lock
+    # from a DXcam/COM library incompatibility. Not counted as WGC/DXGI success.
+    gdi = {"backend": "gdi-diagnostic-only", "usable": False, "error_kind": None}
+    try:
+        from PIL import ImageGrab
+        raw = ImageGrab.grab(all_screens=False)
+        gdi["usable"] = True
+        gdi["width"], gdi["height"] = raw.size
+        gdi["stddev"] = round(float(np.asarray(raw).std()), 1)
+        thumb = raw.convert("RGB").resize(
+            (48, 27), Image.Resampling.BOX
+        ).resize((480, 270), Image.Resampling.NEAREST)
+        name = f"{phase}_gdi_diagnostic_redacted.png"
+        thumb.save(EXPORT / name)
+        gdi["redacted_artifact"] = name
+    except Exception as exc:
+        gdi["error_kind"] = type(exc).__name__
+    result.append(gdi)
     return result
 
 
