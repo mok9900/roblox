@@ -9,3 +9,4 @@ Retry: 2026-11-16, Gmail OTP sign-in confirmed in previous run, then open unsave
 Retry 2026-11-17: Roblox-owned pinned Baseplate EditFile CLI, MCP by process ID, OpenAI tunnel init doctor run.
 Retry 2026-11-17: GitHub token authenticated release API, then Studio EditFile CLI and MCP activation.
 Retry 2026-11-17: reliable login GUI process scan and explicit relaunch; Studio local EditFile test.
+Retry 2026-11-17: psutil installed, process-aware login GUI and local EditFile Place probe.
