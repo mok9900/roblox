@@ -111,9 +111,9 @@ def own_probe_ui() -> None:
     root.title("CI_SAFE_SENDINPUT_PROBE")
     root.geometry("440x250+120+120")
     root.resizable(False, False)
-    tk.Label(root, text="WIN32 INPUT TEST - NO ROBLOX CREDENTIALS").pack(pady=(18, 4))
+    tk.Label(root, text="WIN32 INPUT TEST - NO ROBLOX CREDENTIALS").place(x=40, y=20)
     text = tk.Entry(root, width=22)
-    text.pack(pady=8)
+    text.place(x=100, y=70, width=220, height=30)
     text.insert(0, "")
     result_path = OUT_DIR / "sendinput.json"
 
@@ -122,7 +122,7 @@ def own_probe_ui() -> None:
             "button_clicked": True,
             "keyboard_ok": text.get() == "TEST",
         }), encoding="utf-8")
-    tk.Button(root, text="CLICK TEST", command=done, width=24).pack(pady=15)
+    tk.Button(root, text="CLICK TEST", command=done, width=24).place(x=105, y=140, width=230, height=38)
     root.after(50_000, root.destroy)
     root.mainloop()
 
