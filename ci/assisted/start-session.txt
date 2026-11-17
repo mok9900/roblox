@@ -6,3 +6,4 @@ Retry: 2026-11-16, first prompt approval (50s), then official email code fallbac
 Retry with safe GUI option discovery and one unique masked-email choice when available. 2026-11-16.
 Retry: 2026-11-16 20:11 KST, account email switched to connected Gmail; try Roblox app then official email OTP with encrypted run-bound relay.
 Retry: 2026-11-16, Gmail OTP sign-in confirmed in previous run, then open unsaved Baseplate and enable modern Studio MCP controls.
+Retry 2026-11-17: Roblox-owned pinned Baseplate EditFile CLI, MCP by process ID, OpenAI tunnel init doctor run.
