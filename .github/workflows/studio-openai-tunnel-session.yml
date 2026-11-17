@@ -29,6 +29,9 @@ jobs:
           if (-not $env:ROBLOX_USERNAME -or -not $env:ROBLOX_PASSWORD) { throw 'Missing ROBLOX_USERNAME or ROBLOX_PASSWORD secrets.' }
           if (-not $env:CONTROL_PLANE_API_KEY -or -not $env:CONTROL_PLANE_TUNNEL_ID) { throw 'Missing OPENAI_TUNNEL_RUNTIME_KEY or OPENAI_TUNNEL_ID secrets.' }
           Write-Host 'Required secrets exist.'
+      - name: Suppress Microsoft Edge first-run wizard in this temporary CI machine
+        shell: pwsh
+        run: ./ci/assisted/configure-edge.ps1
       - name: Install Studio and official OpenAI tunnel client
         shell: pwsh
         env:
