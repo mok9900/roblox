@@ -250,21 +250,31 @@ def submit_primary_login():
                 subprocess.Popen([exe], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 print("LOGIN_GUI_RELAUNCH: explicit Studio launch attempted.", flush=True)
             relaunched = True
-        edits = [c for c in cs if ctype(c) == "Edit"]
-        user_fields = [c for c in edits if re.search(r"username|email|phone|사용자 이름|이메일", label(c))]
-        pw_fields = [c for c in edits if re.search(r"password|비밀번호", label(c))]
-        btn = find_button(cs, LOGIN)
-        if len(user_fields) == len(pw_fields) == 1 and btn is not None:
-            user_fields[0].set_edit_text(USER)
-            pw_fields[0].set_edit_text(PASSWORD)
-            btn.click_input()
-            print("ROBLOX_LOGIN_SUBMITTED: official GUI form submitted.", flush=True)
-            return True
+        # Use one official login window at a time. A second Studio window may
+        # have an independent WebView2 form and must not make the field count ambiguous.
+        for win in windows():
+            try:
+                panel = [x for x in win.descendants() if x.is_visible()]
+            except Exception:
+                continue
+            edits = [x for x in panel if ctype(x) == "Edit"]
+            user_fields = [x for x in edits if re.search(r"username|email|phone|사용자 이름|이메일", label(x))]
+            pw_fields = [x for x in edits if re.search(r"password|비밀번호", label(x))]
+            btn = find_button(panel, LOGIN)
+            if len(user_fields) == len(pw_fields) == 1 and btn is not None:
+                user_fields[0].set_edit_text(USER)
+                pw_fields[0].set_edit_text(PASSWORD)
+                btn.click_input()
+                print("ROBLOX_LOGIN_SUBMITTED: official GUI form submitted.", flush=True)
+                return True
         time.sleep(2)
     return False
 
 
 print("Studio GUI: beginning official Roblox sign-in.", flush=True)
+if success(controls()):
+    print("STUDIO_LOGIN_PREEXISTING: edit window already authenticated.", flush=True)
+    sys.exit(0)
 submitted = submit_primary_login()
 USER = ""
 PASSWORD = ""
