@@ -304,6 +304,101 @@ def capture_only_ci_pre_auth_modal() -> dict:
     return result
 
 
+def blue_cta_visual_pilot():
+    """
+    Actual DXGI desktop frame -> color/geometry guard -> OS SendInput click.
+
+    ONLY in this dedicated no-credential Windows Actions diagnostic and ONLY
+    if Studio's home view has Close/Minimize/Maximize but no accessible login
+    controls. Blue CTA must be unique in a restricted central-left ROI.
+    """
+    out = {"visual_blue_candidates": 0, "clicked": False, "error_kind": None}
+    if os.environ.get("ROBLOX_USERNAME") or os.environ.get("ROBLOX_PASSWORD"):
+        out["error_kind"] = "CredentialsPresent"
+        return out
+    import dxcam
+    import numpy as np
+    import psutil
+    from pywinauto import Desktop
+    cam = None
+    try:
+        pids = {p.info["pid"] for p in psutil.process_iter(attrs=("pid", "name"))
+                if (p.info.get("name") or "").lower() == "robloxstudiobeta.exe"}
+        winlist = [w for w in Desktop(backend="uia").windows()
+                   if w.is_visible() and w.element_info.process_id in pids]
+        if len(winlist) != 1:
+            out["error_kind"] = "StudioWindowNotUnique"
+            return out
+        win = winlist[0]
+        cam = dxcam.create(backend="dxgi", processor_backend="numpy", output_color="RGB")
+        frame = cam.grab(new_frame_only=False)
+        if frame is None:
+            out["error_kind"] = "NoFrame"
+            return out
+        img = np.asarray(frame)
+        height, width = img.shape[:2]
+        l, t, r, b = int(width*.10), int(height*.28), int(width*.55), int(height*.70)
+        roi = img[t:b, l:r, :]
+        red, green, blue = [roi[:, :, z].astype(np.int16) for z in range(3)]
+        blue_mask = (blue >= 140) & ((blue-red) >= 58) & ((blue-green) >= 46)
+        rows = blue_mask.sum(axis=1)
+        active = rows >= 85
+        runs = []
+        current = None
+        for i, valid in enumerate(active):
+            if valid and current is None:
+                current = i
+            if (not valid or i == len(active)-1) and current is not None:
+                end = i if not valid else i+1
+                if end-current >= 9:
+                    runs.append((current, end))
+                current = None
+        cand = []
+        for y0, y1 in runs:
+            strip = blue_mask[y0:y1, :]
+            columns = strip.sum(axis=0) >= max(3, int((y1-y0)*.40))
+            xs = np.flatnonzero(columns)
+            if xs.size < 100:
+                continue
+            x0, x1 = int(xs[0]), int(xs[-1])+1
+            density = float(strip[:, x0:x1].mean())
+            if density < .38 or x1-x0 > width*.5:
+                continue
+            cand.append({"area": (x1-x0)*(y1-y0), "density": round(density,2),
+                         "x": l + (x0+x1)//2, "y": t+(y0+y1)//2,
+                         "width": x1-x0, "height": y1-y0})
+        cand.sort(key=lambda z:z["area"], reverse=True)
+        out["visual_blue_candidates"] = len(cand)
+        if len(cand) != 1:
+            return out
+        c = cand[0]
+        rect = wintypes.RECT()
+        if not user32.GetWindowRect(win.handle, ct.byref(rect)):
+            raise RuntimeError("Studio bounds unavailable")
+        if not (rect.left <= c["x"] < rect.right and rect.top <= c["y"] < rect.bottom):
+            raise RuntimeError("CTA not in Studio window")
+        user32.ShowWindow(win.handle, 9)
+        user32.SetForegroundWindow(win.handle)
+        time.sleep(.5)
+        if user32.GetForegroundWindow() != win.handle:
+            raise RuntimeError("Studio not foreground for guarded click")
+        click_abs(c["x"], c["y"])
+        out["clicked"] = True
+        out["button_width"] = c["width"]
+        out["button_height"] = c["height"]
+        time.sleep(9)
+        out["studio_after_click"] = studio_counts()
+    except Exception as exc:
+        out["error_kind"] = type(exc).__name__
+    finally:
+        if cam is not None:
+            try:
+                cam.release()
+            except Exception:
+                pass
+    return out
+
+
 def studio_button_probe_and_safe_click(visual_capture_usable: bool) -> dict:
     """
     On a no-credentials ephemeral Studio runner, use SendInput ONLY against
@@ -362,6 +457,8 @@ def studio_button_probe_and_safe_click(visual_capture_usable: bool) -> dict:
         elif len(oks) == 1 and set(labels) == {"Close", "OK"} and len(found) == 2:
             candidate = oks[0]
         else:
+            if set(labels) == {"Close", "Minimize", "Maximize"}:
+                report["blue_login_cta_visual_pilot"] = blue_cta_visual_pilot()
             return report
         win, control, action = candidate
         rect = control.rectangle()
