@@ -127,3 +127,18 @@ Evidence:
 - Guarded DXGI blue CTA + SendInput click: https://github.com/mok9900/roblox/actions/runs/44045654996
 
 Next: determine whether the button opens an external WebView/browser or changes the Studio startup view; then integrate a well-scoped visual input fallback into the assistant-connected session workflow, preserving verified Gmail 2FA and the no-secrets diagnostic safety boundary.
+
+## Follow-up: on-screen login CTA was clicked via DXGI + SendInput (2026-11-17)
+
+Empirical result: https://github.com/mok9900/roblox/actions/runs/44045654996
+- On BOTH windows-2022 and windows-2025, WGC/DXGI successfully captured the live Roblox Studio startup screen and an ROI-constrained blue CTA was detected. Exactly one matching rectangle with width=287, height=40 appeared per runner.
+- Win32 SetForegroundWindow/GetForegroundWindow guard succeeded and actual SendInput click succeeded on the ROI's center; Studio stayed running.
+- UIA Edit controls in Roblox Studio were still zero after click: this does not prove a signed-in account or even an accessible login form.
+
+Follow-up: https://github.com/mok9900/roblox/actions/runs/44046204082
+- After the guarded SendInput blue-button click, WGC frames showed a **significant visual transition** from the dark Studio welcome view to a light-coloured browser-like window.
+- Browser/WebView2 processes were present after the click (2022: 13 processes, 2025: 11 processes). This is compatible with external browser sign-in but not yet proof of the URL or browser login completion.
+- No Roblox username/password or OTP was provided to the diagnostic workflow. No credential screens were uploaded raw. Only 48x27-pixel irreversible thumbnails were persisted for one day.
+- **Next blocker:** inspect the browser's foreground process and non-sensitive UIA controls in the opened window, handle Edge first-run if it is shown, then validate a credential-secure login flow before reconnecting the existing Gmail OTP automation. No verified MCP/tunnel handshake yet.
+
+Keep the CI diagnostic workflow separate from the credential-bearing session workflow until interactive login screen contents and target inputs can be identified safely. Never send SendInput into arbitrary screen coordinates on a credential-bearing runner.
