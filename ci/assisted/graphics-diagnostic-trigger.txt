@@ -8,3 +8,4 @@ Retry 2026-11-17: correct pilot result key and verify guarded modal OK click.
 Retry 2026-11-17: only pre-auth Studio modal crop on no-secrets runner; SendInput OK and wait 22 seconds.
 Retry 2026-11-17: verify full Roblox Studio installation asset extraction and recheck startup modal.
 Retry 2026-11-17: after stable Studio install detect unique blue login CTA by DXGI pixels and SendInput click without secrets.
+Retry 2026-11-17: WGC post-blue-click screen state and browser process telemetry (no secrets).
