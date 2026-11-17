@@ -388,6 +388,14 @@ def blue_cta_visual_pilot():
         out["button_height"] = c["height"]
         time.sleep(9)
         out["studio_after_click"] = studio_counts()
+        browser_names = {"msedge.exe", "chrome.exe", "firefox.exe", "webview2.exe", "msedgewebview2.exe"}
+        out["browser_process_count"] = sum(
+            1 for p in psutil.process_iter(attrs=("pid", "name"))
+            if (p.info.get("name") or "").lower() in browser_names
+        )
+        out["desktop_total_visible_windows"] = sum(
+            1 for w in Desktop(backend="uia").windows() if w.is_visible()
+        )
     except Exception as exc:
         out["error_kind"] = type(exc).__name__
     finally:
@@ -505,7 +513,8 @@ def main(phase):
     if phase == "studio":
         visual_ok = any(x.get("usable") for x in report["capture"] if x["backend"] in ("dxgi", "winrt"))
         report["studio_login_button_pilot"] = studio_button_probe_and_safe_click(visual_ok)
-        if report["studio_login_button_pilot"]["button_clicked"] is not None:
+        if (report["studio_login_button_pilot"]["button_clicked"] is not None or
+                report["studio_login_button_pilot"].get("blue_login_cta_visual_pilot", {}).get("clicked")):
             report["capture_after_click"] = capture_safe("studio_after_safe_login_click")
     path = EXPORT / f"{phase}_report.json"
     path.write_text(json.dumps(report, indent=2), encoding="utf-8")
