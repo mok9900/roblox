@@ -275,7 +275,11 @@ print("Studio GUI: beginning official Roblox sign-in.", flush=True)
 if success(controls()):
     print("STUDIO_LOGIN_PREEXISTING: edit window already authenticated.", flush=True)
     sys.exit(0)
-submitted = submit_primary_login()
+submitted = os.environ.get("ROBLOX_PRIMARY_SUBMITTED") == "1"
+if submitted:
+    print("ROBLOX_PRIMARY_LOGIN_ALREADY_SUBMITTED: browser WGC/SendInput stage completed.",flush=True)
+else:
+    submitted = submit_primary_login()
 USER = ""
 PASSWORD = ""
 if not submitted:
