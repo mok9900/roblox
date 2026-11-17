@@ -10,3 +10,4 @@ Retry 2026-11-17: Roblox-owned pinned Baseplate EditFile CLI, MCP by process ID,
 Retry 2026-11-17: GitHub token authenticated release API, then Studio EditFile CLI and MCP activation.
 Retry 2026-11-17: reliable login GUI process scan and explicit relaunch; Studio local EditFile test.
 Retry 2026-11-17: psutil installed, process-aware login GUI and local EditFile Place probe.
+Retry 2026-11-17: open pinned Roblox fixture before login; use per-window WebView2 form detection; verify local editor and MCP.
