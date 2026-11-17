@@ -21,6 +21,9 @@ jobs:
           - windows-2025
     steps:
       - uses: actions/checkout@v4
+      - name: Suppress Microsoft Edge first-run wizard in this temporary CI machine
+        shell: pwsh
+        run: ./ci/assisted/configure-edge.ps1
       - name: Install screen capture and Windows input dependencies
         shell: pwsh
         run: |
