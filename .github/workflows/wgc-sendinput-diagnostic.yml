@@ -39,6 +39,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: ./ci/assisted/install-windows.ps1
+      - name: Prime Edge page accessibility on the temporary runner
+        shell: pwsh
+        run: ./ci/assisted/prime-edge.ps1
       - name: Capture privacy-reduced Studio GUI shape
         shell: pwsh
         run: |
