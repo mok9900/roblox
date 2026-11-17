@@ -15,3 +15,5 @@ Run browser process/UIA diagnostics on 2026-11-17 19:05 KST after guarded WGC+Se
 2026-11-17 19:09 KST: skip Edge first run via official HideFirstRunExperience; verify Studio blue CTA opens Roblox login instead of Edge welcome.
 
 2026-11-17 19:12 KST: launch Edge with --force-renderer-accessibility and inspect Roblox browser form labels; no secrets.
+
+2026-11-17 19:16 KST: focus Studio before blue CTA WGC detection after Edge renderer accessibility prelaunch.
