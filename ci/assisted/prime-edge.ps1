@@ -2,7 +2,7 @@ $ErrorActionPreference='Stop'
 # Edge UIA page DOM accessibility may be disabled by default on unattended
 # Windows Server hosts. Pre-open Edge with renderer accessibility enabled.
 $edgePaths = @(
-  "\${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
+  "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
   "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe"
 )
 $edge = $edgePaths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
