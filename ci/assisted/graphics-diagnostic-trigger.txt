@@ -1,0 +1,2 @@
+Run safe WGC / Desktop Duplication / SendInput diagnostic on 2026-11-17.
+This trigger has no account credentials or OTP contents.
