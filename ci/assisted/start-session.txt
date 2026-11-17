@@ -11,3 +11,4 @@ Retry 2026-11-17: GitHub token authenticated release API, then Studio EditFile C
 Retry 2026-11-17: reliable login GUI process scan and explicit relaunch; Studio local EditFile test.
 Retry 2026-11-17: psutil installed, process-aware login GUI and local EditFile Place probe.
 Retry 2026-11-17: open pinned Roblox fixture before login; use per-window WebView2 form detection; verify local editor and MCP.
+Retry 2026-11-17: compare Windows Server 2022 image, local Place-first CLI and Studio MCP.
