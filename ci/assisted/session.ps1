@@ -13,15 +13,18 @@ if ($active.Count -eq 0) {
     Write-Host 'Launching installed Roblox Studio GUI.'
     Start-Process -FilePath $env:STUDIO_EXE | Out-Null
 }
-Write-Host 'Installing Windows UI Automation'
-python -m pip install --disable-pip-version-check --quiet 'pywinauto==0.6.9' 'psutil>=6.1,<8'
-if ($LASTEXITCODE -ne 0) { throw 'Unable to install Windows UI Automation.' }
-Write-Host 'Opening a local test Place before login to expose the Studio editor/authentication shell.'
-./ci/assisted/open-test-place-cli.ps1 -LaunchOnly
-Start-Sleep -Seconds 8
-Write-Host 'Attempting authorized Roblox GUI sign-in.'
+Write-Host 'Installing DXGI screen capture, Windows UI Automation, and SendInput support.'
+python -m pip install --disable-pip-version-check --quiet 'pywinauto==0.6.9' 'psutil>=6.1,<8' 'dxcam[winrt]==0.2.0' 'Pillow>=11,<13'
+if ($LASTEXITCODE -ne 0) { throw 'Unable to install safe Windows GUI automation dependencies.' }
+Write-Host 'Priming Microsoft Edge renderer accessibility on the temporary runner.'
+./ci/assisted/prime-edge.ps1
+Write-Host 'Using in-memory WGC/DXGI to identify Studio login CTA; submitting secrets only to verified Roblox Edge form.'
+python .\ci\assisted\visual-browser-login.py
+if ($LASTEXITCODE -ne 0) { throw 'Visual Roblox browser sign-in failed closed (no fallback to blind credential input).' }
+$env:ROBLOX_PRIMARY_SUBMITTED = '1'
+Write-Host 'Continuing official Roblox app approval or encrypted Gmail 2FA.'
 python .\ci\assisted\login-ui.py
-if ($LASTEXITCODE -ne 0) { throw 'Roblox GUI sign-in not verified (different UI or additional user action needed).' }
+if ($LASTEXITCODE -ne 0) { throw 'Roblox 2FA or Studio login verification not completed.' }
 Write-Host 'Opening an isolated local Roblox-owned Baseplate fixture with official Studio EditFile CLI.'
 ./ci/assisted/open-test-place-cli.ps1
 if ($LASTEXITCODE -ne 0) { throw 'Could not open local Baseplate test file after Roblox authentication.' }
