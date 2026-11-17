@@ -14,3 +14,5 @@ Retry 2026-11-17: open pinned Roblox fixture before login; use per-window WebVie
 Retry 2026-11-17: compare Windows Server 2022 image, local Place-first CLI and Studio MCP.
 
 2026-11-17 19:20 KST: user-authorized session after Edge first run fix, WGC Studio CTA, Edge UIA username/password + SendInput, Gmail OTP, local Baseplate and MCP tunnel.
+
+2026-11-17 19:31 KST: WGC welcome screen retry for 72s before inserting any Roblox secrets; Edge browser UIA + Gmail OTP session.
