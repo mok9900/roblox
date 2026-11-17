@@ -5,3 +5,4 @@ Retry 2026-11-17: fix DXcam 0.2.0 manual release and verify real DXGI/WGC frames
 Retry 2026-11-17: WGC-guided guarded SendInput click for unique accessible Roblox Sign In button without credentials.
 Retry 2026-11-17: safe OK dismiss of Studio startup modal via SendInput on no-credential runner.
 Retry 2026-11-17: correct pilot result key and verify guarded modal OK click.
+Retry 2026-11-17: only pre-auth Studio modal crop on no-secrets runner; SendInput OK and wait 22 seconds.
