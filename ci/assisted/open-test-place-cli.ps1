@@ -1,3 +1,4 @@
+param([switch]$LaunchOnly, [switch]$DownloadOnly)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
@@ -18,10 +19,12 @@ if ($parsed.roblox.version -ne '4') { throw 'PLACE_XML_VERSION_INVALID' }
 Write-Host "PLACE_FILE_READY: downloaded; bytes=$((Get-Item $placeFile).Length)"
 Write-Host "PLACE_FIXTURE_SHA256: $((Get-FileHash -Path $placeFile -Algorithm SHA256).Hash)"
 
+if ($DownloadOnly) { Write-Host 'PLACE_DOWNLOAD_ONLY_OK'; return }
 Write-Host 'PLACE_CLI_LAUNCH: issuing official --task EditFile with local test file.'
 $launchArgs = '--task EditFile --localPlaceFile "' + $placeFile + '"'
 $proc = Start-Process -FilePath $env:STUDIO_EXE -ArgumentList $launchArgs -PassThru
 Write-Host 'PLACE_CLI_PROCESS_STARTED: EditFile task issued.'
+if ($LaunchOnly) { Write-Host 'PLACE_CLI_LAUNCH_ONLY: not asserting editor login yet.'; return }
 python .\ci\assisted\probe-editor-cli.py
 if ($LASTEXITCODE -ne 0) {
     throw 'PLACE_EDITOR_NOT_VERIFIED: local EditFile task did not produce a confirmed open editor.'
