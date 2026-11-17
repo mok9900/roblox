@@ -18,3 +18,4 @@ Retry 2026-11-17: compare Windows Server 2022 image, local Place-first CLI and S
 2026-11-17 19:31 KST: WGC welcome screen retry for 72s before inserting any Roblox secrets; Edge browser UIA + Gmail OTP session.
 
 2026-11-17: production Studio WGC foreground fix; retry browser login + encrypted Gmail OTP + MCP.
+2026-11-17 22:36 KST: retry authorized Roblox Edge primary GUI login with safe expanded 2FA method discovery; email OTP relay only with per-run RSA key.
