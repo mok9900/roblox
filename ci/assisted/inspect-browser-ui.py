@@ -40,7 +40,8 @@ def scan(tag="after_click"):
             psutil.process_iter(attrs=("pid","name"))}
     info = {"tag":tag, "browser_windows":0, "control_types":{},
             "safe_control_labels":[], "window_categories":[],
-            "edit_controls":0, "browser_crop_saved":False}
+            "edit_controls":0, "browser_crop_saved":False,
+            "window_title_has_roblox":False, "safe_button_labels":[], "edit_input_types":[]}
     labels = set()
     crops = []
     for win in Desktop(backend="uia").windows():
@@ -51,6 +52,7 @@ def scan(tag="after_click"):
             if exe not in BROWSERS:
                 continue
             info["browser_windows"] += 1
+            info["window_title_has_roblox"] |= "roblox" in (win.window_text() or "").lower()
             category = "edge" if "edge" in exe else "chrome" if "chrome" in exe else "other_browser"
             info["window_categories"].append(category)
             for c in win.descendants():
@@ -59,9 +61,18 @@ def scan(tag="after_click"):
                 k = c.element_info.control_type
                 if k in ("Button","Edit","Hyperlink","CheckBox","TabItem","Text"):
                     info["control_types"][k] = info["control_types"].get(k,0)+1
+                    label=(c.element_info.name or "").strip()
                     if k=="Edit":
                         info["edit_controls"]+=1
-                    label=(c.element_info.name or "").strip()
+                        if re.search(r"username|user name|email|phone|account|사용자|이메일",label,re.I):
+                            info["edit_input_types"].append("identifier")
+                        elif re.search(r"password|비밀번호",label,re.I):
+                            info["edit_input_types"].append("password")
+                        else:
+                            info["edit_input_types"].append("unlabeled")
+                    if k=="Button" and (re.fullmatch(r"[A-Za-z가-힣 ]{2,55}",label)
+                        and not re.search(r"account|profile|sync|google|microsoft",label,re.I)):
+                        info["safe_button_labels"].append(label)
                     if ALLOWED_TEXT.fullmatch(label):
                         labels.add(f"{k}:{label}")
             # Crop only the client/body below the URL bar.
@@ -73,6 +84,7 @@ def scan(tag="after_click"):
         except Exception:
             continue
     info["safe_control_labels"]=sorted(labels)[:30]
+    info["safe_button_labels"]=sorted(set(info["safe_button_labels"]))[:25]
     info["window_categories"]=sorted(info["window_categories"])
     if len(crops)==1:
         try:
