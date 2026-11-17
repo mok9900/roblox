@@ -330,6 +330,11 @@ def blue_cta_visual_pilot():
             out["error_kind"] = "StudioWindowNotUnique"
             return out
         win = winlist[0]
+        user32.ShowWindow(win.handle, 9)
+        user32.SetForegroundWindow(win.handle)
+        time.sleep(0.6)
+        if user32.GetForegroundWindow() != win.handle:
+            raise RuntimeError("Cannot focus Studio before DXGI frame capture")
         cam = dxcam.create(backend="dxgi", processor_backend="numpy", output_color="RGB")
         frame = cam.grab(new_frame_only=False)
         if frame is None:
