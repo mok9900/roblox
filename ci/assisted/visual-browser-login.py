@@ -97,7 +97,25 @@ def click_center(c):
     rect=c.rectangle()
     click_abs((rect.left+rect.right)//2,(rect.top+rect.bottom)//2)
 
-blue_cta()
+# Installer may leave the Studio executable running before the welcome UI
+# has finished rendering. Retry only non-mutating WGC screenshots; never
+# submit any credentials until a unique expected blue CTA is present.
+cta_ready=False
+for attempt in range(24):
+    try:
+        blue_cta()
+        cta_ready=True
+        break
+    except SystemExit as exc:
+        if str(exc) not in ("STUDIO_WINDOW_NOT_UNIQUE","STUDIO_GRAPHICS_FRAME_UNAVAILABLE",
+                            "STUDIO_LOGIN_CTA_NOT_UNIQUE"):
+            raise
+        if attempt%5==0:
+            print("STUDIO_LOGIN_CTA_PENDING: waiting for Studio welcome GUI.",flush=True)
+        time.sleep(3)
+if not cta_ready:
+    raise SystemExit("STUDIO_LOGIN_CTA_TIMEOUT: safe visual target never appeared")
+
 deadline=time.monotonic()+70
 form=None
 while time.monotonic()<deadline:
