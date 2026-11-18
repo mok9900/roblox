@@ -53,15 +53,25 @@ if ($LASTEXITCODE -ne 0) { throw 'Roblox 2FA or Studio login verification not co
 Write-Host 'Opening an isolated local Roblox-owned Baseplate fixture with official Studio EditFile CLI.'
 ./ci/assisted/open-test-place-cli.ps1
 if ($LASTEXITCODE -ne 0) { throw 'Could not open local Baseplate test file after Roblox authentication.' }
-Write-Host 'Enabling the Studio MCP toggle through the official UI.'
-python .\ci\assisted\activate-mcp-ui.py
-if ($LASTEXITCODE -ne 0) { throw 'Studio MCP enable control not reachable via UI automation.' }
 $mcpBatch = Join-Path $env:LOCALAPPDATA 'Roblox\mcp.bat'
-if (-not (Test-Path $mcpBatch)) { throw 'Studio MCP launcher not found after GUI activation.' }
+$mcpExe = Join-Path (Split-Path -Parent $env:STUDIO_EXE) 'StudioMCP.exe'
+Write-Host "MCP_RUNTIME_SAFE_DIAG: official_launcher_present=$(Test-Path -LiteralPath $mcpBatch), installed_binary_present=$(Test-Path -LiteralPath $mcpExe)"
+# An official launcher may already exist after Studio has authenticated.
+# Never overwrite or fabricate one. If absent, enable it through Studio UI.
+# If present, the following official tunnel doctor must still prove a live
+# MCP handshake before declaring success.
+if (-not (Test-Path -LiteralPath $mcpBatch)) {
+    Write-Host 'MCP_LAUNCHER_MISSING: enabling official Studio MCP from Assistant UI.'
+    python .\ci\assisted\activate-mcp-ui.py
+    if ($LASTEXITCODE -ne 0) { throw 'Studio MCP enable control not reachable via UI automation.' }
+} else {
+    Write-Host 'MCP_OFFICIAL_LAUNCHER_ALREADY_PRESENT: validating via official tunnel doctor.'
+}
+if (-not (Test-Path -LiteralPath $mcpBatch)) { throw 'Studio MCP official launcher absent after UI check.' }
 Write-Host 'Initializing a named OpenAI Secure MCP Tunnel stdio profile.'
 # OpenAI documentation requires init --profile before run --profile.
 # Keep the tunnel runtime API key in the inherited environment, not CLI args.
-$mcpCommand = 'cmd.exe /c "%LOCALAPPDATA%\Roblox\mcp.bat"'
+$mcpCommand = 'cmd.exe /d /s /c "cd /d ""%LOCALAPPDATA%\Roblox"" && call mcp.bat"'
 $profileName = 'roblox-studio-ci'
 & $env:TUNNEL_EXE init --sample sample_mcp_stdio_local --profile $profileName --tunnel-id $env:CONTROL_PLANE_TUNNEL_ID --mcp-command $mcpCommand
 if ($LASTEXITCODE -ne 0) { throw 'OpenAI tunnel profile initialization failed.' }
