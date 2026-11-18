@@ -44,6 +44,18 @@ def verify_native_form():
             c, r"(?:username(?:/email/phone)?|user name|email(?: or username)?|"
                r"username, email, or phone|사용자 이름|이메일 또는 사용자 이름)")]
         passwords = [c for c in edits if exact_control(c, r"(?:password|비밀번호)")]
+        # Some Studio builds expose password semantics via UIA IsPassword
+        # while leaving accessible field labels empty. Use this trusted UIA
+        # property only if it uniquely identifies one of exactly two inputs.
+        if len(passwords) != 1 and len(edits) == 2:
+            try:
+                flagged = [c for c in edits if bool(c.element_info.element.CurrentIsPassword)]
+                if len(flagged) == 1:
+                    passwords = flagged
+            except Exception:
+                pass
+        if len(users) != 1 and len(passwords) == 1 and len(edits) == 2:
+            users = [c for c in edits if c is not passwords[0]]
         logins = [c for c in buttons if exact_control(c, r"(?:log in|login|sign in|로그인)")]
         print("NATIVE_STUDIO_FORM_DIAG: edits=%d user_labels=%d pass_labels=%d login_buttons=%d" %
               (len(edits), len(users), len(passwords), len(logins)), flush=True)
