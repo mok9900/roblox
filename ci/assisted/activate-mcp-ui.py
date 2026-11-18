@@ -163,6 +163,96 @@ def assistant_topbar():
     return False
 
 
+
+def visible_assistant_tooltip():
+    """Recognize only an exact Assistant tooltip owned by Studio.
+
+    The icon can be rendered by Studio's custom UI and have no corresponding
+    UIA Button. Windows tooltip controls are queried through both Win32 and
+    UIA. User names, editor contents, and arbitrary tooltip text are never
+    logged or returned.
+    """
+    pids = studio_pids()
+    for backend in ("win32", "uia"):
+        try:
+            for win in Desktop(backend=backend).windows():
+                try:
+                    if not win.is_visible() or win.process_id() not in pids:
+                        continue
+                    name = (win.window_text() or "").strip().lower()
+                    klass = (win.class_name() or "").lower()
+                    if name in ("assistant", "어시스턴트") and (
+                        "tooltip" in klass or klass.startswith("tooltips")
+                    ):
+                        return True
+                except Exception:
+                    continue
+        except Exception:
+            continue
+    # Some Roblox builds render a tooltip as a Studio-owned text child.
+    for win in studio_windows():
+        try:
+            for element in win.descendants():
+                if not element.is_visible():
+                    continue
+                if kind(element) in ("ToolTip", "Text") and (
+                    safe_name(element) in ("assistant", "어시스턴트")
+                ):
+                    return True
+        except Exception:
+            continue
+    return False
+
+
+def hover_discover_assistant():
+    """Hover-only scan of editor mezzanine; click ONLY after exact tooltip.
+
+    Browser/Studio input fields and the viewport are never clicked. This is
+    a bounded one-time fallback when Roblox's custom-rendered top bar has
+    no accessible button identifiers. Never save screenshot pixels or OCR.
+    """
+    editors = [w for w in studio_windows() if
+               "ci_only_baseplate_test" in (w.window_text() or "").lower()]
+    if len(editors) != 1:
+        print("MCP_HOVER_NOT_SAFE: matching_local_editor_windows=%d" %
+              len(editors), flush=True)
+        return False
+    win = editors[0]
+    try:
+        wr = win.rectangle()
+        if wr.width() < 700 or wr.height() < 500:
+            return False
+        win.set_focus()
+        # Clear any previously visible tooltip before probing.
+        mouse.move(coords=(wr.left + wr.width()//2, wr.top + 240))
+        time.sleep(1.1)
+        if visible_assistant_tooltip():
+            print("MCP_HOVER_PREEXISTING_TOOLTIP: refusing ambiguous click.", flush=True)
+            return False
+        scanned = 0
+        # Known documented region: right side of the top mezzanine.
+        # Only non-mutating mouse hover occurs until a unique tooltip
+        # proves the target is Roblox Assistant.
+        for yoff in (42, 67, 92, 118, 144):
+            for fraction in (.60, .64, .68, .72, .76, .80, .84, .88, .92, .96):
+                x = int(wr.left + wr.width()*fraction)
+                y = int(wr.top + yoff)
+                if not (wr.left < x < wr.right-14 and wr.top < y < wr.bottom):
+                    continue
+                mouse.move(coords=(x, y))
+                time.sleep(.75)
+                scanned += 1
+                if visible_assistant_tooltip():
+                    mouse.click(button="left", coords=(x, y))
+                    print("MCP_ASSISTANT_OPEN_REQUESTED: exact Studio hover tooltip verified.",flush=True)
+                    return True
+        print("MCP_HOVER_SAFE_DIAG: points=%d tooltip_found=False" %
+              scanned,flush=True)
+    except Exception:
+        print("MCP_HOVER_SAFE_DIAG: non-sensitive hover probing failed.",flush=True)
+    return False
+
+
 def launcher_ready():
     return os.path.isfile(os.path.expandvars(r"%LOCALAPPDATA%\Roblox\mcp.bat"))
 
@@ -256,6 +346,11 @@ while time.monotonic() < deadline and not opened:
         opened = assistant_topbar()
     if not opened:
         time.sleep(2)
+if not opened:
+    # Use hover-only discovery on the known opened CI Baseplate editor.
+    # Click is permitted only after Windows exposes the exact official
+    # "Assistant" tooltip, never from icon color/coordinates alone.
+    opened = hover_discover_assistant()
 if not opened:
     safe_diagnostics("assistant_not_found")
     raise SystemExit("ASSISTANT_UI_NOT_ACCESSIBLE")
