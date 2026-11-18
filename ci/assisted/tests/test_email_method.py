@@ -8,7 +8,7 @@ import unittest
 SOURCE = pathlib.Path(__file__).resolve().parents[1] / "login-ui.py"
 tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
 selectors = [n for n in tree.body if isinstance(n, ast.FunctionDef)
-             and n.name in ("find_email_method", "in_browser_content")]
+             and n.name in ("find_email_method", "in_browser_content", "find_code_edit")]
 
 
 class Control:
@@ -25,10 +25,13 @@ scope = {
     "re": re,
     "ctype": lambda c: c.typ,
     "label": lambda c: c.name,
+    "VERIFY": re.compile(r"^(?:verify|confirm|continue|submit|next|인증|확인|계속|다음)$", re.I),
+    "CODE": re.compile(r"verification code|email code|enter code|security code|6.digit|one.time code|인증 코드|이메일 코드|코드 입력", re.I),
 }
 exec(compile(ast.Module(body=selectors, type_ignores=[]), str(SOURCE), "exec"), scope)
 find_email_method = scope["find_email_method"]
 in_browser_content = scope["in_browser_content"]
+find_code_edit = scope["find_code_edit"]
 
 
 class EmailMethodSelectionTest(unittest.TestCase):
@@ -83,6 +86,45 @@ class EmailMethodSelectionTest(unittest.TestCase):
                 Control("Text", "Email"), Control("Text", "Email code")
             ])
         ]))
+
+
+
+class EmailCodeFormTest(unittest.TestCase):
+    def test_single_unlabeled_code_field(self):
+        code = Control("Edit", "")
+        self.assertEqual(find_code_edit([code]), [code])
+
+    def test_three_fields_one_unique_unlabeled_code_and_verify(self):
+        username = Control("Edit", "Username")
+        password = Control("Edit", "Password")
+        code = Control("Edit", "")
+        cs = [username, password, code, Control("Button", "Verify")]
+        self.assertEqual(find_code_edit(cs), [code])
+
+    def test_three_fields_no_verify_is_rejected(self):
+        self.assertEqual(find_code_edit([
+            Control("Edit", "Username"),
+            Control("Edit", "Password"),
+            Control("Edit", ""),
+            Control("Button", "More options")]), [])
+
+    def test_three_fields_with_ambiguous_unlabeled_edits_rejected(self):
+        self.assertEqual(find_code_edit([
+            Control("Edit", "Username"),
+            Control("Edit", ""),
+            Control("Edit", ""),
+            Control("Button", "Verify")]), [])
+
+    def test_three_fields_without_verified_credential_labels_rejected(self):
+        self.assertEqual(find_code_edit([
+            Control("Edit", "First"),
+            Control("Edit", "Second"),
+            Control("Edit", ""),
+            Control("Button", "Verify")]), [])
+
+    def test_explicit_code_label_preferred(self):
+        code = Control("Edit", "Verification code")
+        self.assertEqual(find_code_edit([Control("Edit", "Email"), code]), [code])
 
 
 class Rect:
