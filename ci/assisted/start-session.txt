@@ -36,3 +36,4 @@ Retry 2026-11-18: Studio-only OTP login proven, editor UI generated 3 ribbon tab
 Retry 2026-11-18: verified Studio local Baseplate open, check official MCP launcher before UI activation; top-right Assistant via UI AutomationId/help-text; tunnel doctor and list_roblox_studios, no user games touched.
 Retry 2026-11-18 ~18:54 KST: user requested continue; verify official Studio MCP launcher presence and Assistant top-right UIA target after already-proven Studio login/Baseplate, then Secure MCP Tunnel doctor.
 Retry 2026-11-18 KST: after official Gmail OTP completes in Edge, detect and click only explicitly Studio-named browser-to-Studio handoff controls; verify native Studio auth, Baseplate, MCP launcher and OpenAI Secure Tunnel.
+Retry 2026-11-18 KST: scan Roblox challenge Email method in Name, AutomationId and HelpText; produce privacy-safe control shape diagnostics; run-bound RSA OTP; verify editor, official MCP launcher and tunnel.
