@@ -19,9 +19,15 @@ if ($active.Count -eq 0) {
     Start-Process -FilePath $env:STUDIO_EXE | Out-Null
 }
 Start-Sleep -Seconds 3
-Write-Host 'Using in-memory WGC/DXGI to identify Studio login CTA; submitting secrets only to verified Roblox Edge form.'
-python .\ci\assisted\visual-browser-login.py
-if ($LASTEXITCODE -ne 0) { throw 'Visual Roblox browser sign-in failed closed (no fallback to blind credential input).' }
+Write-Host 'Checking a uniquely labeled native Studio login form before browser fallback.'
+python .\ci\assisted\native-studio-login.py
+if ($LASTEXITCODE -eq 10) {
+    Write-Host 'No verified native form: trying guarded WGC Roblox browser login.'
+    python .\ci\assisted\visual-browser-login.py
+    if ($LASTEXITCODE -ne 0) { throw 'Visual Roblox browser sign-in failed closed.' }
+} elseif ($LASTEXITCODE -ne 0) {
+    throw 'Native Studio login form failed safe validation; aborting without blind input.'
+}
 $env:ROBLOX_PRIMARY_SUBMITTED = '1'
 Write-Host 'Continuing official Roblox app approval or encrypted Gmail 2FA.'
 python .\ci\assisted\login-ui.py
