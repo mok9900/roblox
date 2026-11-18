@@ -24,29 +24,44 @@ def windows(exe):
             pass
     return result
 
+def focus_studio(window):
+    """Restore the real Studio window; never type/click without HWND match."""
+    import ctypes as ct
+    hwnd = window.handle
+    user32.ShowWindow(hwnd, 9)
+    # Temporary topmost activation can resolve focus lock after Edge priming
+    # on ephemeral Windows runners. Always remove the topmost flag afterward.
+    user32.SetWindowPos.argtypes = [
+        ct.c_void_p, ct.c_void_p, ct.c_int, ct.c_int,
+        ct.c_int, ct.c_int, ct.c_uint
+    ]
+    user32.SetWindowPos.restype = ct.c_int
+    flags = 0x0001 | 0x0002 | 0x0040  # SWP_NOSIZE|NOMOVE|SHOWWINDOW
+    try:
+        for attempt in range(3):
+            if user32.GetForegroundWindow() == hwnd:
+                return True
+            try:
+                window.set_focus()
+            except Exception:
+                pass
+            user32.SetWindowPos(hwnd, ct.c_void_p(-1), 0, 0, 0, 0, flags)
+            user32.SetForegroundWindow(hwnd)
+            time.sleep(0.5)
+            if user32.GetForegroundWindow() == hwnd:
+                return True
+            time.sleep(0.7)
+    finally:
+        user32.SetWindowPos(hwnd, ct.c_void_p(-2), 0, 0, 0, 0, flags)
+    return user32.GetForegroundWindow() == hwnd
+
+
 def blue_cta():
     wins=windows("robloxstudiobeta.exe")
     if len(wins)!=1: raise SystemExit("STUDIO_WINDOW_NOT_UNIQUE")
     # Same explicit foreground sequence that passed on both Windows
     # 2022 and 2025 credential-free WGC+SendInput diagnostic runners.
-    hwnd = wins[0].handle
-    user32.ShowWindow(hwnd, 9)
-    # A primed Edge browser can own the foreground lock on GitHub's Windows
-    # runner. pywinauto.set_focus() uses a Windows-aware activation path;
-    # verify the actual foreground HWND before any physical input.
-    try:
-        wins[0].set_focus()
-    except Exception:
-        pass
-    user32.SetForegroundWindow(hwnd)
-    time.sleep(.6)
-    if user32.GetForegroundWindow() != hwnd:
-        try:
-            wins[0].set_focus()
-            time.sleep(.4)
-        except Exception:
-            pass
-    if user32.GetForegroundWindow() != hwnd:
+    if not focus_studio(wins[0]):
         raise SystemExit("STUDIO_FOCUS_NOT_READY")
     cam=None
     try:
