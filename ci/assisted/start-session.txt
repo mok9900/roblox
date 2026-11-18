@@ -29,3 +29,4 @@ Retry 2026-11-18: confirmed native Roblox alternate 2FA offers duplicated Email 
 Retry 2026-11-18 17:xx KST: user explicitly authorized GitHub and Gmail; native email 2FA, use fresh run-bound encrypted OTP relay, verify Place editor and OpenAI MCP tunnel. Do not log secrets.
 Retry 2026-11-18 post-safe-restart fix: single guarded pre-credential Studio GUI restart if no native edit fields/unique DXGI CTA; then fresh email OTP and local Place/MCP verification.
 Retry 2026-11-18: logged-in session confirmed, strict editor UI probe updated with same-window stable Studio ribbon evidence; UI Assistant View/Window gateway and MCP tunnel. Fresh per-run RSA email OTP only.
+Retry 2026-11-18: prefer native Studio UI via one safe pre-credential restart; edge-only fallback, official email 2FA, verified editor-only ribbon tabs, Roblox MCP and tunnel connection.
