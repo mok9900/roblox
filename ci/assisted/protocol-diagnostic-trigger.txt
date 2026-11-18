@@ -1,0 +1,1 @@
+Credential-free verification of official roblox-studio-auth Windows URI handler after signed Studio installation. No passwords, session cookies, OTP or OAuth URLs inspected.
