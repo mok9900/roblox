@@ -200,17 +200,35 @@ def find_code_edit(cs):
         return edits
     if len(candidates) in (6, 8):
         return candidates
+    # Roblox's Edge challenge sometimes leaves its prior username/password
+    # Edit controls in the accessibility tree alongside one UNNAMED OTP
+    # input. Only accept that third field if the two credential controls are
+    # explicitly identified, an official Verify button is visible, and no
+    # other ambiguous edits exist. Never guess coordinates or input order.
+    if len(edits) == 3 and any(
+        ctype(c) == "Button" and VERIFY.fullmatch(label(c)) for c in cs
+    ):
+        users = [c for c in edits if re.fullmatch(
+            r"(?:username|user name|username, email, or phone|email|사용자 이름|이메일)", label(c), re.I)]
+        passwords = [c for c in edits if re.fullmatch(r"(?:password|비밀번호)", label(c), re.I)]
+        if len(users) == len(passwords) == 1 and users[0] is not passwords[0]:
+            others = [c for c in edits if c is not users[0] and c is not passwords[0]]
+            if len(others) == 1 and not label(others[0]):
+                print("EMAIL_CODE_FORM_STRUCTURAL_MATCH: one unlabeled code edit plus two recognized credential edits.",flush=True)
+                return others
     return []
 
 
 def enter_code(code):
     deadline = time.monotonic() + 35
     while time.monotonic() < deadline:
-        cs = controls()
+        # Use only the isolated official Roblox challenge window, never
+        # the union of unrelated Studio/Edge windows.
+        cs = challenge_controls()
         edits = find_code_edit(cs)
         if len(edits) == 1:
             edits[0].set_edit_text(code)
-            if not click_button(controls(), VERIFY):
+            if not click_button(challenge_controls(), VERIFY):
                 # Certain official Roblox forms submit automatically on all digits.
                 print("EMAIL_CODE_ENTERED: awaiting auto-submit or form validation.", flush=True)
             else:
@@ -219,7 +237,7 @@ def enter_code(code):
         if len(edits) == len(code):
             for field, digit in zip(edits, code):
                 field.set_edit_text(digit)
-            click_button(controls(), VERIFY)
+            click_button(challenge_controls(), VERIFY)
             print("EMAIL_CODE_ENTERED: code digits entered into official verification form.", flush=True)
             return
         time.sleep(2)
@@ -447,14 +465,17 @@ if not challenge_detected:
 if await_studio(time.monotonic() + 3):
     sys.exit(0)
 
-print("APP_APPROVAL_NOT_CONFIRMED: trying Roblox email code option.", flush=True)
-if not choose_email():
-    raise SystemExit("EMAIL_METHOD_UNAVAILABLE: email option not accessible in Roblox challenge")
+print("APP_APPROVAL_NOT_CONFIRMED: checking official Roblox code form before opening alternatives.", flush=True)
+if find_code_edit(challenge_controls()):
+    print("EMAIL_CODE_FORM_READY: an existing official challenge input is uniquely identified.",flush=True)
+else:
+    if not choose_email():
+        raise SystemExit("EMAIL_METHOD_UNAVAILABLE: email option not accessible in Roblox challenge")
 
 print("EMAIL_METHOD_SELECTED: checking whether Roblox actually displayed an OTP input.", flush=True)
 code_form_deadline = time.monotonic() + 30
 while time.monotonic() < code_form_deadline:
-    if find_code_edit(controls()):
+    if find_code_edit(challenge_controls()):
         break
     time.sleep(2)
 else:
