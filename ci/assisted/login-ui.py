@@ -200,21 +200,81 @@ def click_button(cs, pattern):
         return False
 
 
+def find_browser_handoff(cs):
+    """Select only a unique, explicitly Studio-named browser handoff action.
+
+    A generic Open/Continue/Allow button is NOT acceptable; this protects
+    against unrelated browser prompts and unsafe protocol-handler clicks.
+    """
+    target = re.compile(
+        r"^(?:open|launch|return to|back to|continue to|continue in|"
+        r"switch to|go to) (?:the )?(?:roblox )?studio(?: app)?$"
+        r"|^(?:roblox )?studio(?:를|로|에서|으로)? (?:열기|실행|돌아가기|계속하기)$",
+        re.I
+    )
+    candidates = [c for c in cs
+                  if ctype(c) in ("Button", "Hyperlink", "MenuItem")
+                  and target.fullmatch(label(c))]
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def try_browser_studio_handoff():
+    """Inspect official Roblox Edge windows only; no URLs or text are logged."""
+    pids = {
+        p.info["pid"] for p in psutil.process_iter(attrs=("pid", "name"))
+        if (p.info.get("name") or "").lower() == "msedge.exe"
+    }
+    browser_windows = []
+    for win in Desktop(backend="uia").windows():
+        try:
+            if win.is_visible() and win.element_info.process_id in pids and (
+                "roblox" in (win.window_text() or "").lower()
+            ):
+                browser_windows.append(win)
+        except Exception:
+            continue
+    if len(browser_windows) != 1:
+        print("STUDIO_HANDOFF_SAFE_DIAG: official_edge_windows=%d" %
+              len(browser_windows), flush=True)
+        return False
+    try:
+        controls = [c for c in browser_windows[0].descendants() if c.is_visible()]
+        target = find_browser_handoff(controls)
+        print("STUDIO_HANDOFF_SAFE_DIAG: official_edge_windows=1, explicit_target=%s" %
+              bool(target), flush=True)
+        if target is None:
+            return False
+        target.click_input()
+        print("STUDIO_BROWSER_HANDOFF_CLICKED: uniquely labeled Studio return action.", flush=True)
+        return True
+    except Exception:
+        return False
+
+
 def await_studio(deadline):
     last_diag = 0
+    handoff_checked = False
+    handoff_clicked = False
     while time.monotonic() < deadline:
         cs = studio_only_controls()
         if success(cs):
             print("STUDIO_LOGIN_UI_VERIFIED: signed-in Studio-process menu detected.", flush=True)
             return True
         now=time.monotonic()
+        if not handoff_checked and now+8 < deadline:
+            # Give the official Roblox browser a few seconds to finish its
+            # 2FA response, then try one explicitly named return-to-Studio
+            # action if present. This is not a generic browser button click.
+            time.sleep(3)
+            handoff_clicked = try_browser_studio_handoff()
+            handoff_checked = True
         if now-last_diag >= 15:
             nav = {label(c) for c in cs if label(c) in NAV}
             auth = sum(1 for c in cs if ctype(c) == "Edit" and
                        re.search(r"password|비밀번호|username|user name|email|이메일|인증 코드|verification code",label(c)))
             challenge = any(CHALLENGE.search(label(c)) for c in cs)
-            print("STUDIO_AUTH_SAFE_POLL: studio_controls=%d nav_count=%d auth_edits=%d challenge_ui=%s" %
-                  (len(cs),len(nav),auth,challenge),flush=True)
+            print("STUDIO_AUTH_SAFE_POLL: studio_controls=%d nav_count=%d auth_edits=%d challenge_ui=%s handoff_clicked=%s" %
+                  (len(cs),len(nav),auth,challenge,handoff_clicked),flush=True)
             last_diag=now
         time.sleep(2)
     return False
