@@ -94,6 +94,52 @@ def ctype(control):
         return None
 
 
+def in_browser_content(control_rect, window_rect):
+    """Exclude browser chrome, address bar and toolbar from Roblox challenge."""
+    try:
+        cx = (control_rect.left + control_rect.right) / 2
+        cy = (control_rect.top + control_rect.bottom) / 2
+        return (
+            window_rect.left + 25 < cx < window_rect.right - 25
+            and window_rect.top + 125 < cy < window_rect.bottom - 25
+            and control_rect.right > control_rect.left
+            and control_rect.bottom > control_rect.top
+        )
+    except Exception:
+        return False
+
+
+def challenge_controls():
+    """Visible controls only inside the Roblox-titled Edge document area.
+
+    Never search the browser toolbar: its built-in 'More options' is unrelated
+    to Roblox verification and caused previous false-positive menu clicks.
+    """
+    ids = {
+        p.info["pid"] for p in psutil.process_iter(attrs=("pid", "name"))
+        if (p.info.get("name") or "").lower() == "msedge.exe"
+    }
+    roblox_windows = []
+    for window in Desktop(backend="uia").windows():
+        try:
+            if (window.is_visible() and window.element_info.process_id in ids
+                    and "roblox" in (window.window_text() or "").lower()):
+                roblox_windows.append(window)
+        except Exception:
+            pass
+    if len(roblox_windows) != 1:
+        return []
+    window = roblox_windows[0]
+    try:
+        bounds = window.rectangle()
+        return [
+            c for c in window.descendants()
+            if c.is_visible() and in_browser_content(c.rectangle(), bounds)
+        ]
+    except Exception:
+        return []
+
+
 def success(cs):
     names = [label(c) for c in cs]
     nav = any(n in NAV for n in names)
@@ -194,7 +240,7 @@ def safe_choice_diagnostics():
     safe = set()
     kinds = {}
     e = 0
-    for c in controls():
+    for c in challenge_controls():
         typ = ctype(c)
         if typ in ("Button","Hyperlink","MenuItem","RadioButton","TabItem","ListItem","Text","Custom"):
             kinds[typ] = kinds.get(typ, 0) + 1
@@ -247,31 +293,39 @@ def find_email_method(cs):
 
 
 def choose_email():
-    # The email-code option is available only if a verified email exists on the account.
+    """Use official Roblox email 2FA choice, never Edge's toolbar menu."""
     alternatives_opened = False
-    for stage in range(15):
-        cs = controls()
-        if click_button(cs, EMAIL_CONTROL):
-            print("EMAIL_FALLBACK_SELECTED: requested Roblox's official email verification.", flush=True)
-            time.sleep(3)
-            return True
-        # A masked account address may be the email option. Only select it from
-        # the officially opened alternative-verification menu, never elsewhere.
-        if alternatives_opened:
-            method = find_email_method(cs)
-            if method is not None:
+    for stage in range(16):
+        cs = challenge_controls()
+        if not cs:
+            if stage % 4 == 0:
+                print("ROBLOX_2FA_PAGE_NOT_ACCESSIBLE: browser content not ready.", flush=True)
+            time.sleep(2)
+            continue
+
+        method = find_email_method(cs)
+        if method is not None:
+            try:
+                method.click_input()
+                print("EMAIL_METHOD_SELECTED: uniquely labeled Roblox challenge item.", flush=True)
+                time.sleep(3)
+                return True
+            except Exception:
+                pass
+
+        # Only use an explicitly labeled, in-page Roblox verification control.
+        # Generic Microsoft Edge 'More options' is outside challenge_controls().
+        if not alternatives_opened:
+            other = find_button(cs, OTHER_CONTROL)
+            if other is not None:
                 try:
-                    method.click_input()
-                    print("EMAIL_METHOD_SELECTED: unique explicitly labeled choice.", flush=True)
+                    other.click_input()
+                    alternatives_opened = True
+                    print("ROBLOX_2FA_PAGE_ALTERNATIVES_OPENED.", flush=True)
                     time.sleep(3)
-                    return True
+                    safe_choice_diagnostics()
                 except Exception:
                     pass
-        if not alternatives_opened and click_button(cs, OTHER_CONTROL):
-            alternatives_opened = True
-            print("EMAIL_FALLBACK_OPENED_ALTERNATIVE_METHODS.", flush=True)
-            time.sleep(4)
-            safe_choice_diagnostics()
         time.sleep(2)
     safe_choice_diagnostics()
     return False
