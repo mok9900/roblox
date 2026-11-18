@@ -30,8 +30,24 @@ def studio_pids():
     }
 
 
+def studio_related_pids():
+    """Include only Studio-owned WebView2 descendants, never unrelated Edge.
+
+    Recent Studio Assistant UI may be hosted in an isolated WebView2 process
+    and thus absent from RobloxStudioBeta.exe's own UIA subtree.
+    """
+    roots = studio_pids()
+    descendants = set(roots)
+    for pid in roots:
+        try:
+            descendants.update(c.pid for c in psutil.Process(pid).children(recursive=True))
+        except Exception:
+            continue
+    return descendants
+
+
 def studio_windows():
-    pids = studio_pids()
+    pids = studio_related_pids()
     out = []
     for window in Desktop(backend="uia").windows():
         try:
@@ -172,7 +188,7 @@ def visible_assistant_tooltip():
     UIA. User names, editor contents, and arbitrary tooltip text are never
     logged or returned.
     """
-    pids = studio_pids()
+    pids = studio_related_pids()
     for backend in ("win32", "uia"):
         try:
             for win in Desktop(backend=backend).windows():
