@@ -40,6 +40,66 @@ def kind(c):
     except Exception:
         return ""
 
+
+def safe_identifier(c):
+    """Use only UIA metadata to identify Roblox's Assistant button."""
+    try:
+        return (c.element_info.automation_id or "").strip().lower()
+    except Exception:
+        return ""
+
+
+def safe_help(c):
+    try:
+        return (c.element_info.help_text or "").strip().lower()
+    except Exception:
+        return ""
+
+
+def assistant_topbar():
+    """Find an unambiguously identified Assistant control in Studio's top-right.
+
+    New Studio UI places Assistant in the right side of the mezzanine, rather
+    than the legacy View toolbar. Never click an arbitrary icon or guessed
+    coordinate; use a matching label/AutomationId/help text *and* geometry.
+    """
+    pids = {
+        p.info["pid"] for p in psutil.process_iter(attrs=("pid", "name"))
+        if (p.info.get("name") or "").lower() == "robloxstudiobeta.exe"
+    }
+    hits = []
+    for win in Desktop(backend="uia").windows():
+        try:
+            if not win.is_visible() or win.element_info.process_id not in pids:
+                continue
+            wr = win.rectangle()
+            if wr.width() < 600 or wr.height() < 400:
+                continue
+            for control in win.descendants():
+                if not control.is_visible() or kind(control) not in ("Button", "Hyperlink", "Custom"):
+                    continue
+                metadata = (label(control), safe_identifier(control), safe_help(control))
+                if not any(re.search(r"assistant|어시스턴트", item, re.I) for item in metadata):
+                    continue
+                cr = control.rectangle()
+                mid_x = (cr.left + cr.right) / 2
+                mid_y = (cr.top + cr.bottom) / 2
+                if (wr.left + wr.width() * 0.58 <= mid_x < wr.right
+                        and wr.top <= mid_y <= wr.top + 145
+                        and 8 <= cr.width() <= 150 and 8 <= cr.height() <= 95):
+                    hits.append(control)
+        except Exception:
+            continue
+    print("MCP_ASSISTANT_TOPBAR_CANDIDATES: %d" % len(hits), flush=True)
+    if len(hits) != 1:
+        return False
+    try:
+        hits[0].click_input()
+        print("MCP_ASSISTANT_TOPBAR_OPENED: unique verified Assistant accessibility control.",flush=True)
+        return True
+    except Exception:
+        return False
+
 def click_exact(pattern, timeout=12):
     end = time.monotonic() + timeout
     order = ("Button", "MenuItem", "Hyperlink", "TabItem", "CheckBox", "ListItem", "Text", "Custom")
@@ -75,7 +135,9 @@ def safe_uia_summary():
     print("MCP_SAFE_CONTROLS: " + ", ".join(names[:20]), flush=True)
 
 print("MCP_SETUP: finding Assistant in an open Studio editor.", flush=True)
-assistant_opened = click_exact(r"assistant|어시스턴트", 25)
+assistant_opened = click_exact(r"assistant|어시스턴트", 12)
+if not assistant_opened:
+    assistant_opened = assistant_topbar()
 if not assistant_opened:
     # In some Studio layouts Assistant is hidden until its official View
     # ribbon tab or Window menu is opened. Only click individually labeled
