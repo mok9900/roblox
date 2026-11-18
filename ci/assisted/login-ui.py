@@ -253,7 +253,7 @@ def try_browser_studio_handoff():
 
 def await_studio(deadline):
     last_diag = 0
-    handoff_checked = False
+    handoff_next_try = time.monotonic() + 4
     handoff_clicked = False
     while time.monotonic() < deadline:
         cs = studio_only_controls()
@@ -261,13 +261,12 @@ def await_studio(deadline):
             print("STUDIO_LOGIN_UI_VERIFIED: signed-in Studio-process menu detected.", flush=True)
             return True
         now=time.monotonic()
-        if not handoff_checked and now+8 < deadline:
-            # Give the official Roblox browser a few seconds to finish its
-            # 2FA response, then try one explicitly named return-to-Studio
-            # action if present. This is not a generic browser button click.
-            time.sleep(3)
+        if not handoff_clicked and now >= handoff_next_try and now+8 < deadline:
+            # The official browser may render its handoff asynchronously.
+            # Recheck a handful of times; never click a generic or ambiguous
+            # target, and never repeat a successful handoff click.
             handoff_clicked = try_browser_studio_handoff()
-            handoff_checked = True
+            handoff_next_try = now + 9
         if now-last_diag >= 15:
             nav = {label(c) for c in cs if label(c) in NAV}
             auth = sum(1 for c in cs if ctype(c) == "Edit" and
