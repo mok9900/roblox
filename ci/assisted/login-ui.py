@@ -386,6 +386,21 @@ PASSWORD = ""
 if not submitted:
     raise SystemExit("LOGIN_CONTROLS_NOT_ACCESSIBLE")
 
+# If email verification is configured as the default 2FA method, Roblox may
+# present the code form immediately, without a mobile-app approval challenge.
+# Use only a Roblox-titled Edge document (not browser chrome or a generic Edit).
+page = challenge_controls()
+if page and find_code_edit(page):
+    print("EMAIL_CODE_FORM_READY: default official Roblox code form detected.", flush=True)
+    print("OTP_RELAY_READY: encrypted run-bound email code is required.", flush=True)
+    code = wait_for_code(timeout=540)
+    enter_code(code)
+    code = ""
+    if not await_studio(time.monotonic() + 75):
+        raise SystemExit("EMAIL_CODE_SUBMITTED_BUT_LOGIN_NOT_VERIFIED")
+    print("EMAIL_DEFAULT_METHOD_SUCCEEDED.", flush=True)
+    sys.exit(0)
+
 print("APP_APPROVAL_PENDING: open Roblox mobile app NOW and approve this sign-in promptly.", flush=True)
 start = time.monotonic()
 app_deadline = start + 50
