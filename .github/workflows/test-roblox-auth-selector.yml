@@ -1,0 +1,25 @@
+name: Roblox 2FA menu-selector unit tests
+on:
+  push:
+    branches:
+      - feature/studio-openai-tunnel-assisted
+    paths:
+      - ci/assisted/login-ui.py
+      - ci/assisted/tests/test_email_method.py
+      - .github/workflows/test-roblox-auth-selector.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  selector-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Python GUI login selector
+        run: python -m py_compile ci/assisted/login-ui.py
+      - name: Test email-only selection, nested labels, and ambiguous choices
+        run: python -m unittest discover -s ci/assisted/tests -p 'test_email_method.py' -v
