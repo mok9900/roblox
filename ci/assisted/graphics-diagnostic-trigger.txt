@@ -17,3 +17,4 @@ Run browser process/UIA diagnostics on 2026-11-17 19:05 KST after guarded WGC+Se
 2026-11-17 19:12 KST: launch Edge with --force-renderer-accessibility and inspect Roblox browser form labels; no secrets.
 
 2026-11-17 19:16 KST: focus Studio before blue CTA WGC detection after Edge renderer accessibility prelaunch.
+2026-11-18: reproduce pre-Studio Edge priming, credential-free WGC blue login CTA probe.
