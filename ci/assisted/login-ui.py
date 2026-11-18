@@ -210,6 +210,25 @@ def safe_choice_diagnostics():
     ),flush=True)
 
 
+def find_email_method(cs):
+    """Match only an explicitly named email choice in the open 2FA method menu."""
+    eligible = ("MenuItem", "RadioButton", "ListItem", "Button", "Hyperlink")
+    yes = re.compile(r"e-?mail|이메일", re.I)
+    no = re.compile(r"settings|change|remove|disable|account recovery|설정|변경|삭제|복구", re.I)
+    matched = []
+    for control in cs:
+        if ctype(control) not in eligible:
+            continue
+        name = label(control)
+        if len(name) > 120 or not yes.search(name) or no.search(name):
+            continue
+        matched.append(control)
+    if len(matched) == 1:
+        return matched[0]
+    # Multiple overlapping controls are ambiguous: fail closed.
+    return None
+
+
 def choose_email():
     # The email-code option is available only if a verified email exists on the account.
     alternatives_opened = False
@@ -222,16 +241,11 @@ def choose_email():
         # A masked account address may be the email option. Only select it from
         # the officially opened alternative-verification menu, never elsewhere.
         if alternatives_opened:
-            email_buttons = [
-                c for c in cs
-                if ctype(c) in ("Button", "Hyperlink", "RadioButton", "ListItem", "Text")
-                and "@" in label(c) and len(label(c)) < 110
-                and not re.search(r"password|username|비밀번호|사용자", label(c))
-            ]
-            if len(email_buttons) == 1:
+            method = find_email_method(cs)
+            if method is not None:
                 try:
-                    email_buttons[0].click_input()
-                    print("EMAIL_FALLBACK_SELECTED: selected unique masked-email verification option.", flush=True)
+                    method.click_input()
+                    print("EMAIL_METHOD_SELECTED: unique explicitly labeled choice.", flush=True)
                     time.sleep(3)
                     return True
                 except Exception:
