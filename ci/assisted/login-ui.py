@@ -110,34 +110,41 @@ def in_browser_content(control_rect, window_rect):
 
 
 def challenge_controls():
-    """Visible controls only inside the Roblox-titled Edge document area.
+    """Inspect Roblox Edge page or a single official native Studio window.
 
-    Never search the browser toolbar: its built-in 'More options' is unrelated
-    to Roblox verification and caused previous false-positive menu clicks.
+    Browser chrome is excluded by geometry. Native Studio may use a built-in
+    email-code challenge instead of a separate Edge verification page.
     """
-    ids = {
-        p.info["pid"] for p in psutil.process_iter(attrs=("pid", "name"))
-        if (p.info.get("name") or "").lower() == "msedge.exe"
-    }
-    roblox_windows = []
+    pmap = {p.info["pid"]: (p.info.get("name") or "").lower()
+            for p in psutil.process_iter(attrs=("pid", "name"))}
+    edge = []
+    studio = []
     for window in Desktop(backend="uia").windows():
         try:
-            if (window.is_visible() and window.element_info.process_id in ids
-                    and "roblox" in (window.window_text() or "").lower()):
-                roblox_windows.append(window)
+            if not window.is_visible():
+                continue
+            exe = pmap.get(window.element_info.process_id, "")
+            if exe == "msedge.exe" and "roblox" in (window.window_text() or "").lower():
+                edge.append(window)
+            if exe == "robloxstudiobeta.exe":
+                studio.append(window)
         except Exception:
             pass
-    if len(roblox_windows) != 1:
+    if len(edge) == 1:
+        try:
+            bounds = edge[0].rectangle()
+            return [c for c in edge[0].descendants()
+                    if c.is_visible() and in_browser_content(c.rectangle(), bounds)]
+        except Exception:
+            return []
+    if len(edge) > 1:
         return []
-    window = roblox_windows[0]
-    try:
-        bounds = window.rectangle()
-        return [
-            c for c in window.descendants()
-            if c.is_visible() and in_browser_content(c.rectangle(), bounds)
-        ]
-    except Exception:
-        return []
+    if len(studio) == 1:
+        try:
+            return [c for c in studio[0].descendants() if c.is_visible()]
+        except Exception:
+            return []
+    return []
 
 
 def success(cs):
