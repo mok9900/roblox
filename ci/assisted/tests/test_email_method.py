@@ -76,6 +76,22 @@ class EmailMethodSelectionTest(unittest.TestCase):
             Control("MenuItem", "Change email in account settings")
         ]))
 
+    def test_unique_email_automation_id_is_accepted(self):
+        target = Control("MenuItem", "Verification method")
+        target.element_info = type("Meta", (), {
+            "automation_id": "email-method", "help_text": ""
+        })()
+        self.assertIs(find_email_method([
+            target, Control("MenuItem", "Backup code")
+        ]), target)
+
+    def test_email_account_settings_automation_id_is_rejected(self):
+        target = Control("MenuItem", "Verification method")
+        target.element_info = type("Meta", (), {
+            "automation_id": "change-email-settings", "help_text": ""
+        })()
+        self.assertIsNone(find_email_method([target]))
+
     def test_no_clickable_email_choice_is_rejected(self):
         self.assertIsNone(find_email_method([
             Control("Text", "Email"), Control("Button", "More options")
