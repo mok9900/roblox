@@ -19,3 +19,4 @@ Retry 2026-11-17: compare Windows Server 2022 image, local Place-first CLI and S
 
 2026-11-17: production Studio WGC foreground fix; retry browser login + encrypted Gmail OTP + MCP.
 2026-11-17 22:36 KST: retry authorized Roblox Edge primary GUI login with safe expanded 2FA method discovery; email OTP relay only with per-run RSA key.
+Retry 2026-11-18 KST: user requested automatic Roblox Studio MCP using tested email 2FA selector, local test Place, OpenAI tunnel.
