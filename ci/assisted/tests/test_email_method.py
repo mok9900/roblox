@@ -49,6 +49,13 @@ class EmailMethodSelectionTest(unittest.TestCase):
         target = Control("RadioButton", "이메일로 코드 받기")
         self.assertIs(find_email_method([target]), target)
 
+    def test_native_email_button_inside_list_item(self):
+        button = Control("Button", "Email")
+        list_item = Control("ListItem", "Email")
+        self.assertIs(find_email_method([
+            Control("ListItem", "Backup code"), list_item, button
+        ]), button)
+
     def test_ambiguous_email_choices_fail_closed(self):
         self.assertIsNone(find_email_method([
             Control("MenuItem", "Email"), Control("Button", "Email code")
