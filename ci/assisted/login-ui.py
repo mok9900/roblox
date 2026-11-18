@@ -211,22 +211,39 @@ def safe_choice_diagnostics():
 
 
 def find_email_method(cs):
-    """Match only an explicitly named email choice in the open 2FA method menu."""
+    """Find a single visible email method in Roblox's opened 2FA selector.
+
+    Some Windows accessibility trees expose the method name on a nested
+    Text control instead of the clickable MenuItem. Never select a generic
+    menu item based on its position or an unverified bounding box.
+    """
     eligible = ("MenuItem", "RadioButton", "ListItem", "Button", "Hyperlink")
-    yes = re.compile(r"e-?mail|이메일", re.I)
-    no = re.compile(r"settings|change|remove|disable|account recovery|설정|변경|삭제|복구", re.I)
-    matched = []
+    email = re.compile(r"e-?mail|이메일", re.I)
+    excluded = re.compile(
+        r"settings|change|remove|disable|account recovery|"
+        r"설정|변경|삭제|복구", re.I
+    )
+    matches = []
     for control in cs:
         if ctype(control) not in eligible:
             continue
         name = label(control)
-        if len(name) > 120 or not yes.search(name) or no.search(name):
+        if not name:
+            try:
+                names = [
+                    label(child) for child in control.descendants()
+                    if ctype(child) in ("Text", "Button", "Hyperlink")
+                ]
+                names = [n for n in names if n and len(n) <= 120]
+                if len([n for n in names if email.search(n) and not excluded.search(n)]) == 1:
+                    name = next(n for n in names if email.search(n) and not excluded.search(n))
+            except Exception:
+                continue
+        if not name or len(name) > 120:
             continue
-        matched.append(control)
-    if len(matched) == 1:
-        return matched[0]
-    # Multiple overlapping controls are ambiguous: fail closed.
-    return None
+        if email.search(name) and not excluded.search(name):
+            matches.append(control)
+    return matches[0] if len(matches) == 1 else None
 
 
 def choose_email():
