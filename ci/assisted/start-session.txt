@@ -23,3 +23,4 @@ Retry 2026-11-18 KST: user requested automatic Roblox Studio MCP using tested em
 Retry 2026-11-18: Roblox challenge-only Edge content scope; reject Edge toolbar More options; unit tests passed.
 Retry 2026-11-18 14:11 KST: user enabled email 2FA; test official email method, encrypted OTP relay, unsaved test Place and MCP Tunnel.
 Retry 2026-11-18: native Studio foreground activation fix, email verification now enabled, encrypted Gmail OTP relay.
+Retry 2026-11-18: Edge primed before Studio, verified temporary topmost GUI activation, default email OTP form handling, then test Place and MCP tunnel.
