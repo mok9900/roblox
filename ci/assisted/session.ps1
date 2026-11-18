@@ -22,33 +22,27 @@ Start-Sleep -Seconds 3
 Write-Host 'Checking a uniquely labeled native Studio login form before browser fallback.'
 # Try each verified sign-in mode only when the preceding mode did not
 # enter any credentials. Never retry after an ambiguous/partial submission.
+# The native Studio login form provides the most reliable, explicitly
+# labeled official email-OTP challenge. Prefer it over a browser fallback.
+# A brand-new runner sometimes displays a blank Studio welcome window;
+# restart it ONCE before any secrets are submitted, then retry native UIA.
 python .\ci\assisted\native-studio-login.py
 $nativeResult = $LASTEXITCODE
 if ($nativeResult -eq 10) {
-    Write-Host 'No verified native form: trying guarded WGC Roblox browser login.'
+    Write-Host 'PRE_CREDENTIAL_NATIVE_RESTART: no verified native fields; restart Studio once before considering browser.'
+    Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 4
+    Start-Process -FilePath $env:STUDIO_EXE | Out-Null
+    Start-Sleep -Seconds 8
+    python .\ci\assisted\native-studio-login.py
+    $nativeResult = $LASTEXITCODE
+}
+if ($nativeResult -eq 10) {
+    Write-Host 'NATIVE_STUDIO_UNAVAILABLE_AFTER_RESTART: using guarded WGC/Edge only if unique verified controls exist.'
     python .\ci\assisted\visual-browser-login.py
-    $visualResult = $LASTEXITCODE
-    if ($visualResult -eq 10) {
-        # The visual script returned its dedicated BEFORE-CREDENTIALS-only
-        # status. On unattended runners Studio sometimes starts without its
-        # actual login pane. Restart exactly once, revalidate every control.
-        Write-Host 'PRE_CREDENTIAL_STUDIO_RESTART: no verified form or login CTA; retrying safe launch once.'
-        Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 4
-        Start-Process -FilePath $env:STUDIO_EXE | Out-Null
-        Start-Sleep -Seconds 8
-        python .\ci\assisted\native-studio-login.py
-        $nativeResult = $LASTEXITCODE
-        if ($nativeResult -eq 10) {
-            python .\ci\assisted\visual-browser-login.py
-            $visualResult = $LASTEXITCODE
-        } elseif ($nativeResult -eq 0) {
-            $visualResult = 0
-        } else {
-            throw 'Restarted Studio native form did not pass safe validation.'
-        }
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Visual Roblox browser sign-in failed closed; no blind credentials retry.'
     }
-    if ($visualResult -ne 0) { throw 'Visual Roblox browser sign-in failed closed after bounded safe retry.' }
 } elseif ($nativeResult -ne 0) {
     throw 'Native Studio login form failed safe validation; aborting without blind input.'
 }
