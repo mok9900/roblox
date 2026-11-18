@@ -10,6 +10,7 @@ on:
       - ci/assisted/probe-editor-cli.py
       - ci/assisted/activate-mcp-ui.py
       - ci/assisted/session.ps1
+      - ci/assisted/configure-edge.ps1
       - ci/assisted/tests/test_email_method.py
       - .github/workflows/test-roblox-auth-selector.yml
   workflow_dispatch:
@@ -39,10 +40,16 @@ jobs:
         run: |
           $tokens = $null
           $parseErrors = $null
-          $path = (Resolve-Path '.\\ci\\assisted\\session.ps1').Path
-          [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$parseErrors) | Out-Null
+          $paths = @('.\\ci\\assisted\\session.ps1', '.\\ci\\assisted\\configure-edge.ps1')
+          foreach ($path in $paths) {
+            $resolved = (Resolve-Path $path).Path
+            [System.Management.Automation.Language.Parser]::ParseFile($resolved, [ref]$tokens, [ref]$parseErrors) | Out-Null
+          }
           if ($parseErrors.Count -gt 0) {
             $parseErrors | ForEach-Object { Write-Error $_.Message }
             throw 'SESSION_PS1_SYNTAX_INVALID'
           }
-          Write-Host 'SESSION_PS1_SYNTAX_VERIFIED'
+          Write-Host 'SESSION_AND_EDGE_PS1_SYNTAX_VERIFIED'
+      - name: Apply and validate narrow temporary Edge Studio callback policy
+        shell: pwsh
+        run: ./ci/assisted/configure-edge.ps1
