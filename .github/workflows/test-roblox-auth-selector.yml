@@ -11,6 +11,7 @@ on:
       - ci/assisted/activate-mcp-ui.py
       - ci/assisted/session.ps1
       - ci/assisted/configure-edge.ps1
+      - ci/assisted/check-studio-auth-protocol.ps1
       - ci/assisted/tests/test_email_method.py
       - .github/workflows/test-roblox-auth-selector.yml
   workflow_dispatch:
@@ -40,7 +41,7 @@ jobs:
         run: |
           $tokens = $null
           $parseErrors = $null
-          $paths = @('.\\ci\\assisted\\session.ps1', '.\\ci\\assisted\\configure-edge.ps1')
+          $paths = @('.\\ci\\assisted\\session.ps1', '.\\ci\\assisted\\configure-edge.ps1', '.\\ci\\assisted\\check-studio-auth-protocol.ps1')
           foreach ($path in $paths) {
             $resolved = (Resolve-Path $path).Path
             [System.Management.Automation.Language.Parser]::ParseFile($resolved, [ref]$tokens, [ref]$parseErrors) | Out-Null
