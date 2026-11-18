@@ -8,7 +8,7 @@ import unittest
 SOURCE = pathlib.Path(__file__).resolve().parents[1] / "login-ui.py"
 tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
 selectors = [n for n in tree.body if isinstance(n, ast.FunctionDef)
-             and n.name in ("find_email_method", "in_browser_content", "find_code_edit", "find_browser_handoff")]
+             and n.name in ("find_email_method", "in_browser_content", "find_code_edit", "find_browser_handoff", "find_protocol_consent")]
 
 
 class Control:
@@ -33,6 +33,7 @@ find_email_method = scope["find_email_method"]
 in_browser_content = scope["in_browser_content"]
 find_code_edit = scope["find_code_edit"]
 find_browser_handoff = scope["find_browser_handoff"]
+find_protocol_consent = scope["find_protocol_consent"]
 
 
 class EmailMethodSelectionTest(unittest.TestCase):
@@ -172,6 +173,47 @@ class BrowserHandoffSafetyTest(unittest.TestCase):
             Control("Hyperlink", "Continue to Roblox"),
         ]))
 
+
+
+
+class BrowserProtocolConsentTest(unittest.TestCase):
+    def test_specific_protocol_open_with_cancel_in_studio_context(self):
+        target = Control("Button", "Open")
+        cs = [
+            Control("Text", "Open Roblox Studio?"),
+            Control("Text", "A link wants to launch an external application"),
+            target,
+            Control("Button", "Cancel"),
+        ]
+        self.assertIs(find_protocol_consent(cs, "Open Roblox Studio?"), target)
+
+    def test_generic_open_without_studio_context_is_rejected(self):
+        self.assertIsNone(find_protocol_consent([
+            Control("Text", "Open an external application?"),
+            Control("Button", "Open"),
+            Control("Button", "Cancel"),
+        ], "Open external link?"))
+
+    def test_studio_name_without_external_context_is_rejected(self):
+        self.assertIsNone(find_protocol_consent([
+            Control("Text", "Roblox Studio"),
+            Control("Button", "Open"),
+            Control("Button", "Cancel"),
+        ], "Roblox Studio"))
+
+    def test_missing_cancel_guard_is_rejected(self):
+        self.assertIsNone(find_protocol_consent([
+            Control("Text", "Open Roblox Studio external app?"),
+            Control("Button", "Open"),
+        ], "Open Roblox Studio?"))
+
+    def test_ambiguous_two_open_buttons_rejected(self):
+        self.assertIsNone(find_protocol_consent([
+            Control("Text", "Open Roblox Studio external application"),
+            Control("Button", "Open"),
+            Control("Button", "Open Roblox Studio"),
+            Control("Button", "Cancel"),
+        ], "Roblox Studio protocol"))
 
 
 class Rect:
