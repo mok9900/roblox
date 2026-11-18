@@ -296,7 +296,17 @@ def find_email_method(cs):
             continue
         if email.search(name) and not excluded.search(name):
             matches.append(control)
-    return matches[0] if len(matches) == 1 else None
+    if len(matches) == 1:
+        return matches[0]
+    # Roblox's native selector represents the SAME Email choice as a
+    # clickable Button nested within a ListItem. Treat exactly this pair
+    # as one choice; unrelated/ambiguous email options still fail closed.
+    if len(matches) == 2:
+        types = {ctype(c) for c in matches}
+        names = {label(c) for c in matches}
+        if types == {"Button", "ListItem"} and names == {"email"}:
+            return next(c for c in matches if ctype(c) == "Button")
+    return None
 
 
 def choose_email():
