@@ -1,3 +1,4 @@
+param([switch]$RequireRegistered)
 $ErrorActionPreference = 'Stop'
 # Credential-free check of the official Roblox Studio browser callback
 # registration. Never execute the protocol, print handler command lines, or
@@ -35,4 +36,5 @@ if ($valid) {
     Write-Host 'STUDIO_AUTH_SCHEME_REGISTERED: Roblox Studio protocol handler has a valid-looking registration.'
 } else {
     Write-Host 'STUDIO_AUTH_SCHEME_NOT_CONFIRMED: browser login may not hand off to Studio.'
+    if ($RequireRegistered) { throw 'OFFICIAL_STUDIO_AUTH_SCHEME_UNREGISTERED' }
 }
