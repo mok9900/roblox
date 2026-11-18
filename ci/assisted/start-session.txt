@@ -26,3 +26,4 @@ Retry 2026-11-18: native Studio foreground activation fix, email verification no
 Retry 2026-11-18: Edge primed before Studio, verified temporary topmost GUI activation, default email OTP form handling, then test Place and MCP tunnel.
 Retry 2026-11-18: prioritize unique native Studio login form found by credential-free Windows 2022 diagnostic, then email OTP, local Place, MCP.
 Retry 2026-11-18: confirmed native Roblox alternate 2FA offers duplicated Email Button/ListItem; fixed selector; run-bound email OTP, then MCP.
+Retry 2026-11-18 17:xx KST: user explicitly authorized GitHub and Gmail; native email 2FA, use fresh run-bound encrypted OTP relay, verify Place editor and OpenAI MCP tunnel. Do not log secrets.
