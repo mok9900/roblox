@@ -29,10 +29,24 @@ def blue_cta():
     if len(wins)!=1: raise SystemExit("STUDIO_WINDOW_NOT_UNIQUE")
     # Same explicit foreground sequence that passed on both Windows
     # 2022 and 2025 credential-free WGC+SendInput diagnostic runners.
-    user32.ShowWindow(wins[0].handle, 9)
-    user32.SetForegroundWindow(wins[0].handle)
+    hwnd = wins[0].handle
+    user32.ShowWindow(hwnd, 9)
+    # A primed Edge browser can own the foreground lock on GitHub's Windows
+    # runner. pywinauto.set_focus() uses a Windows-aware activation path;
+    # verify the actual foreground HWND before any physical input.
+    try:
+        wins[0].set_focus()
+    except Exception:
+        pass
+    user32.SetForegroundWindow(hwnd)
     time.sleep(.6)
-    if user32.GetForegroundWindow() != wins[0].handle:
+    if user32.GetForegroundWindow() != hwnd:
+        try:
+            wins[0].set_focus()
+            time.sleep(.4)
+        except Exception:
+            pass
+    if user32.GetForegroundWindow() != hwnd:
         raise SystemExit("STUDIO_FOCUS_NOT_READY")
     cam=None
     try:
