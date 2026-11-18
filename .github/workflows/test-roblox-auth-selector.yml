@@ -5,6 +5,8 @@ on:
       - feature/studio-openai-tunnel-assisted
     paths:
       - ci/assisted/login-ui.py
+      - ci/assisted/native-studio-login.py
+      - ci/assisted/visual-browser-login.py
       - ci/assisted/tests/test_email_method.py
       - .github/workflows/test-roblox-auth-selector.yml
   workflow_dispatch:
@@ -20,6 +22,6 @@ jobs:
         with:
           python-version: '3.12'
       - name: Compile Python GUI login selector
-        run: python -m py_compile ci/assisted/login-ui.py
+        run: python -m py_compile ci/assisted/login-ui.py ci/assisted/native-studio-login.py ci/assisted/visual-browser-login.py
       - name: Test email-only selection, nested labels, and ambiguous choices
         run: python -m unittest discover -s ci/assisted/tests -p 'test_email_method.py' -v
