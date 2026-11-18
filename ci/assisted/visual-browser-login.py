@@ -147,7 +147,10 @@ for attempt in range(24):
             print("STUDIO_LOGIN_CTA_PENDING: " + str(exc),flush=True)
         time.sleep(3)
 if not cta_ready:
-    raise SystemExit("STUDIO_LOGIN_CTA_TIMEOUT: safe visual target never appeared")
+    # Exit 10 means no Roblox credentials were typed or submitted. The caller
+    # may safely restart Studio once and retry GUI discovery, never blind input.
+    print("STUDIO_LOGIN_CTA_TIMEOUT: safe visual target never appeared", flush=True)
+    raise SystemExit(10)
 
 deadline=time.monotonic()+70
 form=None
