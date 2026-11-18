@@ -32,3 +32,4 @@ Retry 2026-11-18: logged-in session confirmed, strict editor UI probe updated wi
 Retry 2026-11-18: prefer native Studio UI via one safe pre-credential restart; edge-only fallback, official email 2FA, verified editor-only ribbon tabs, Roblox MCP and tunnel connection.
 Retry 2026-11-18 final validation: strict verified 3-edit official Roblox code challenge detection; Gmail run-bound encrypted OTP; validate stable Place editor ribbon and official Studio Assistant MCP without guessing UI targets.
 Retry 2026-11-18: isolated Studio-only authentication verification to avoid stale Edge browser challenge false negatives; verified encrypted Gmail email OTP; stable Place editor and MCP tunnel checks.
+Retry 2026-11-18: Studio-only OTP login proven, editor UI generated 3 ribbon tabs just before old 120s timeout; extend to 240s and validate official Assistant MCP toggle and secure tunnel.
