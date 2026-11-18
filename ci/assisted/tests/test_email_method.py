@@ -8,7 +8,7 @@ import unittest
 SOURCE = pathlib.Path(__file__).resolve().parents[1] / "login-ui.py"
 tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
 selectors = [n for n in tree.body if isinstance(n, ast.FunctionDef)
-             and n.name in ("find_email_method", "in_browser_content", "find_code_edit")]
+             and n.name in ("find_email_method", "in_browser_content", "find_code_edit", "find_browser_handoff")]
 
 
 class Control:
@@ -32,6 +32,7 @@ exec(compile(ast.Module(body=selectors, type_ignores=[]), str(SOURCE), "exec"), 
 find_email_method = scope["find_email_method"]
 in_browser_content = scope["in_browser_content"]
 find_code_edit = scope["find_code_edit"]
+find_browser_handoff = scope["find_browser_handoff"]
 
 
 class EmailMethodSelectionTest(unittest.TestCase):
@@ -125,6 +126,36 @@ class EmailCodeFormTest(unittest.TestCase):
     def test_explicit_code_label_preferred(self):
         code = Control("Edit", "Verification code")
         self.assertEqual(find_code_edit([Control("Edit", "Email"), code]), [code])
+
+
+class BrowserHandoffSafetyTest(unittest.TestCase):
+    def test_unique_explicit_studio_return_is_allowed(self):
+        c = Control("Button", "Open Roblox Studio")
+        self.assertIs(find_browser_handoff([c]), c)
+
+    def test_explicit_studio_link_is_allowed(self):
+        c = Control("Hyperlink", "Continue to Studio")
+        self.assertIs(find_browser_handoff([c]), c)
+
+    def test_generic_browser_prompt_is_rejected(self):
+        self.assertIsNone(find_browser_handoff([
+            Control("Button", "Open"),
+            Control("Button", "Allow"),
+            Control("Button", "Continue"),
+        ]))
+
+    def test_multiple_handoff_targets_are_rejected(self):
+        self.assertIsNone(find_browser_handoff([
+            Control("Button", "Open Roblox Studio"),
+            Control("Hyperlink", "Return to Roblox Studio"),
+        ]))
+
+    def test_unrelated_browser_destination_is_rejected(self):
+        self.assertIsNone(find_browser_handoff([
+            Control("Button", "Open Account Settings"),
+            Control("Hyperlink", "Continue to Roblox"),
+        ]))
+
 
 
 class Rect:
