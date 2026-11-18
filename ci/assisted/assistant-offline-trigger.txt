@@ -1,0 +1,1 @@
+2026-11-19 credential-free UIA and hovered tooltip diagnostic of official Assistant on local Roblox-owned Baseplate. No Roblox credentials, screenshots, clicking, game mutation, publication or OAuth callback access.
