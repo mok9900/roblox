@@ -75,7 +75,18 @@ def safe_uia_summary():
     print("MCP_SAFE_CONTROLS: " + ", ".join(names[:20]), flush=True)
 
 print("MCP_SETUP: finding Assistant in an open Studio editor.", flush=True)
-if not click_exact(r"assistant|어시스턴트", 35):
+assistant_opened = click_exact(r"assistant|어시스턴트", 25)
+if not assistant_opened:
+    # In some Studio layouts Assistant is hidden until its official View
+    # ribbon tab or Window menu is opened. Only click individually labeled
+    # Studio controls, not guessed screen coordinates or browser chrome.
+    for gateway in (r"view|보기", r"window|창"):
+        if click_exact(gateway, 8):
+            print("MCP_UI_GATEWAY_OPENED: whitelisted Studio ribbon/menu.", flush=True)
+            if click_exact(r"assistant|어시스턴트", 15):
+                assistant_opened = True
+                break
+if not assistant_opened:
     safe_uia_summary()
     raise SystemExit("ASSISTANT_UI_NOT_ACCESSIBLE")
 
