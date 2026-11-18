@@ -218,38 +218,79 @@ def find_browser_handoff(cs):
     return candidates[0] if len(candidates) == 1 else None
 
 
+def find_protocol_consent(cs, title):
+    """Match only Edge's explicit Roblox Studio protocol consent dialog.
+
+    A generic Open or Allow button is unsafe by itself. It can be used only
+    inside a uniquely identified Edge modal containing Roblox Studio *and*
+    an explicit external-app/protocol launch context. No OAuth URL is read.
+    """
+    names = [label(c) for c in cs if ctype(c) in
+             ("Text", "Button", "Hyperlink", "Window", "Pane", "Custom")]
+    context = " ".join(n for n in names if len(n) <= 140)
+    title = (title or "").strip().lower()
+    is_studio = "roblox studio" in context or "roblox studio" in title
+    is_external = bool(re.search(
+        r"(?:open|launch|external (?:app|application)|associated (?:app|application)|"
+        r"protocol|link|앱에서 열기|외부 앱|애플리케이션 실행|열겠습니까)",
+        context + " " + title, re.I
+    ))
+    if not (is_studio and is_external):
+        return None
+    buttons = [c for c in cs if ctype(c) == "Button"]
+    cancel = [c for c in buttons if re.fullmatch(
+        r"(?:cancel|취소|not now|don't open)", label(c), re.I)]
+    accept = [c for c in buttons if re.fullmatch(
+        r"(?:open|open roblox studio|launch roblox studio|"
+        r"roblox studio 열기|열기)", label(c), re.I)]
+    if len(accept) != 1 or len(cancel) < 1:
+        return None
+    return accept[0]
+
+
 def try_browser_studio_handoff():
-    """Inspect official Roblox Edge windows only; no URLs or text are logged."""
+    """Click at most one explicitly authenticated Studio handoff target.
+
+    Scope to the Edge process and either an official Roblox page or a known
+    external protocol dialog. Never read, print, or replay the OAuth callback
+    URI (which can contain an authorization code and state token).
+    """
     pids = {
         p.info["pid"] for p in psutil.process_iter(attrs=("pid", "name"))
         if (p.info.get("name") or "").lower() == "msedge.exe"
     }
-    browser_windows = []
+    candidates = []
+    roots_seen = 0
     for win in Desktop(backend="uia").windows():
         try:
-            if win.is_visible() and win.element_info.process_id in pids and (
-                "roblox" in (win.window_text() or "").lower()
-            ):
-                browser_windows.append(win)
+            if not win.is_visible() or win.element_info.process_id not in pids:
+                continue
+            title = win.window_text() or ""
+            if "roblox" not in title.lower():
+                continue
+            roots_seen += 1
+            cs = [c for c in win.descendants() if c.is_visible()]
+            explicit = find_browser_handoff(cs)
+            modal = find_protocol_consent(cs, title)
+            if explicit is not None and modal is not None and explicit is not modal:
+                continue
+            button = modal or explicit
+            if button is not None:
+                candidates.append((button, bool(modal)))
         except Exception:
             continue
-    if len(browser_windows) != 1:
-        print("STUDIO_HANDOFF_SAFE_DIAG: official_edge_windows=%d" %
-              len(browser_windows), flush=True)
+    print("STUDIO_HANDOFF_SAFE_DIAG: roblox_edge_windows=%d verified_targets=%d protocol_prompt=%s" %
+          (roots_seen, len(candidates), any(m for _, m in candidates)), flush=True)
+    if len(candidates) != 1:
         return False
     try:
-        controls = [c for c in browser_windows[0].descendants() if c.is_visible()]
-        target = find_browser_handoff(controls)
-        print("STUDIO_HANDOFF_SAFE_DIAG: official_edge_windows=1, explicit_target=%s" %
-              bool(target), flush=True)
-        if target is None:
-            return False
-        target.click_input()
-        print("STUDIO_BROWSER_HANDOFF_CLICKED: uniquely labeled Studio return action.", flush=True)
+        button, protocol = candidates[0]
+        button.click_input()
+        print("STUDIO_BROWSER_HANDOFF_CLICKED: uniquely verified Studio %s action." %
+              ("protocol consent" if protocol else "return"), flush=True)
         return True
     except Exception:
         return False
-
 
 def await_studio(deadline):
     last_diag = 0
