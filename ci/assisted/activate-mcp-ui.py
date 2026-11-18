@@ -104,7 +104,8 @@ def tooltip_assistant():
     names = set()
     for w in Desktop(backend="uia").windows():
         try:
-            if w.is_visible() and w.element_info.control_type == "ToolTip":
+            if (w.is_visible() and w.element_info.control_type == "ToolTip"
+                    and w.element_info.process_id in studio_pids()):
                 name = (w.element_info.name or "").strip().lower()
                 if name in ("assistant", "어시스턴트"):
                     names.add(name)
