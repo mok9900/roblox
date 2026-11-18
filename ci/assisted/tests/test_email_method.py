@@ -7,8 +7,8 @@ import unittest
 
 SOURCE = pathlib.Path(__file__).resolve().parents[1] / "login-ui.py"
 tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
-selector = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
-                and n.name == "find_email_method")
+selectors = [n for n in tree.body if isinstance(n, ast.FunctionDef)
+             and n.name in ("find_email_method", "in_browser_content")]
 
 
 class Control:
@@ -26,8 +26,9 @@ scope = {
     "ctype": lambda c: c.typ,
     "label": lambda c: c.name,
 }
-exec(compile(ast.Module(body=[selector], type_ignores=[]), str(SOURCE), "exec"), scope)
+exec(compile(ast.Module(body=selectors, type_ignores=[]), str(SOURCE), "exec"), scope)
 find_email_method = scope["find_email_method"]
+in_browser_content = scope["in_browser_content"]
 
 
 class EmailMethodSelectionTest(unittest.TestCase):
@@ -75,6 +76,29 @@ class EmailMethodSelectionTest(unittest.TestCase):
                 Control("Text", "Email"), Control("Text", "Email code")
             ])
         ]))
+
+
+class Rect:
+    def __init__(self,left,top,right,bottom):
+        self.left, self.top, self.right, self.bottom = left,top,right,bottom
+
+
+class BrowserGeometryTest(unittest.TestCase):
+    def test_page_choice_included(self):
+        self.assertTrue(in_browser_content(Rect(390,300,690,355),
+                                           Rect(0,0,1024,768)))
+
+    def test_edge_top_toolbar_excluded(self):
+        self.assertFalse(in_browser_content(Rect(900,25,1010,85),
+                                            Rect(0,0,1024,768)))
+
+    def test_edge_menu_from_toolbar_excluded(self):
+        self.assertFalse(in_browser_content(Rect(870,50,1020,120),
+                                            Rect(0,0,1024,768)))
+
+    def test_outside_window_excluded(self):
+        self.assertFalse(in_browser_content(Rect(1170,300,1300,350),
+                                            Rect(0,0,1024,768)))
 
 
 if __name__ == "__main__":
