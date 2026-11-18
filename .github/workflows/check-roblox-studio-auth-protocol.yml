@@ -1,0 +1,24 @@
+name: Credential-free Roblox Studio auth protocol registration check
+on:
+  push:
+    branches:
+      - feature/studio-openai-tunnel-assisted
+    paths:
+      - ci/assisted/protocol-diagnostic-trigger.txt
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  protocol:
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install signed Roblox Studio and verify content extraction
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./ci/assisted/install-windows.ps1
+      - name: Read only standard Windows auth scheme registry metadata
+        shell: pwsh
+        run: ./ci/assisted/check-studio-auth-protocol.ps1
