@@ -8,16 +8,17 @@ if (-not $env:CONTROL_PLANE_API_KEY -or -not $env:CONTROL_PLANE_TUNNEL_ID) {
 }
 if (-not $env:STUDIO_EXE -or -not (Test-Path $env:STUDIO_EXE)) { throw 'Studio executable missing.' }
 if (-not $env:TUNNEL_EXE -or -not (Test-Path $env:TUNNEL_EXE)) { throw 'OpenAI tunnel executable missing.' }
-$active = @(Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue)
-if ($active.Count -eq 0) {
-    Write-Host 'Launching installed Roblox Studio GUI.'
-    Start-Process -FilePath $env:STUDIO_EXE | Out-Null
-}
 Write-Host 'Installing DXGI screen capture, Windows UI Automation, and SendInput support.'
 python -m pip install --disable-pip-version-check --quiet 'pywinauto==0.6.9' 'psutil>=6.1,<8' 'dxcam[winrt]==0.2.0' 'Pillow>=11,<13'
 if ($LASTEXITCODE -ne 0) { throw 'Unable to install safe Windows GUI automation dependencies.' }
-Write-Host 'Priming Microsoft Edge renderer accessibility on the temporary runner.'
+Write-Host 'Priming Microsoft Edge renderer accessibility BEFORE activating Studio.'
 ./ci/assisted/prime-edge.ps1
+$active = @(Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue)
+if ($active.Count -eq 0) {
+    Write-Host 'Launching installed Roblox Studio GUI after Edge priming.'
+    Start-Process -FilePath $env:STUDIO_EXE | Out-Null
+}
+Start-Sleep -Seconds 3
 Write-Host 'Using in-memory WGC/DXGI to identify Studio login CTA; submitting secrets only to verified Roblox Edge form.'
 python .\ci\assisted\visual-browser-login.py
 if ($LASTEXITCODE -ne 0) { throw 'Visual Roblox browser sign-in failed closed (no fallback to blind credential input).' }
