@@ -226,7 +226,9 @@ def find_protocol_consent(cs, title):
     an explicit external-app/protocol launch context. No OAuth URL is read.
     """
     names = [label(c) for c in cs if ctype(c) in
-             ("Text", "Button", "Hyperlink", "Window", "Pane", "Custom")]
+             ("Text", "Window", "Pane", "Custom")]
+    # Button text such as a generic "Open" is NOT evidence of an external
+    # protocol dialog; it must be corroborated by non-action context.
     context = " ".join(n for n in names if len(n) <= 140)
     title = (title or "").strip().lower()
     is_studio = "roblox studio" in context or "roblox studio" in title
