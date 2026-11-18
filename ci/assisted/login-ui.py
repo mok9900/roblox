@@ -70,6 +70,29 @@ def windows():
     return result
 
 
+
+def studio_only_controls():
+    """Read only genuine Studio-process controls for signed-in state.
+
+    The external Roblox Edge challenge may stay visible after its 2FA has
+    succeeded; its residual username/password/challenge UI must not make the
+    already-authenticated Studio appear unauthenticated. Never trust browser
+    navigation tabs alone as evidence of Studio success.
+    """
+    pids = {
+        p.info["pid"] for p in psutil.process_iter(attrs=("pid", "name"))
+        if (p.info.get("name") or "").lower() == "robloxstudiobeta.exe"
+    }
+    out = []
+    for win in Desktop(backend="uia").windows():
+        try:
+            if win.is_visible() and win.element_info.process_id in pids:
+                out.extend(c for c in win.descendants() if c.is_visible())
+        except Exception:
+            continue
+    return out
+
+
 def controls():
     out = []
     for win in windows():
@@ -178,11 +201,21 @@ def click_button(cs, pattern):
 
 
 def await_studio(deadline):
+    last_diag = 0
     while time.monotonic() < deadline:
-        cs = controls()
+        cs = studio_only_controls()
         if success(cs):
-            print("STUDIO_LOGIN_UI_VERIFIED: signed-in Studio menu detected.", flush=True)
+            print("STUDIO_LOGIN_UI_VERIFIED: signed-in Studio-process menu detected.", flush=True)
             return True
+        now=time.monotonic()
+        if now-last_diag >= 15:
+            nav = {label(c) for c in cs if label(c) in NAV}
+            auth = sum(1 for c in cs if ctype(c) == "Edit" and
+                       re.search(r"password|비밀번호|username|user name|email|이메일|인증 코드|verification code",label(c)))
+            challenge = any(CHALLENGE.search(label(c)) for c in cs)
+            print("STUDIO_AUTH_SAFE_POLL: studio_controls=%d nav_count=%d auth_edits=%d challenge_ui=%s" %
+                  (len(cs),len(nav),auth,challenge),flush=True)
+            last_diag=now
         time.sleep(2)
     return False
 
@@ -408,7 +441,7 @@ def submit_primary_login():
 
 
 print("Studio GUI: beginning official Roblox sign-in.", flush=True)
-if success(controls()):
+if success(studio_only_controls()):
     print("STUDIO_LOGIN_PREEXISTING: edit window already authenticated.", flush=True)
     sys.exit(0)
 submitted = os.environ.get("ROBLOX_PRIMARY_SUBMITTED") == "1"
@@ -443,7 +476,7 @@ challenge_detected = False
 notice_time = 0
 while time.monotonic() < app_deadline:
     cs = controls()
-    if success(cs):
+    if success(studio_only_controls()):
         print("APP_APPROVAL_SUCCEEDED.", flush=True)
         sys.exit(0)
     labels = [label(c) for c in cs]
