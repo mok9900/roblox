@@ -371,6 +371,24 @@ def safe_choice_diagnostics():
         e,kinds.get("MenuItem",0),kinds.get("RadioButton",0),
         kinds.get("ListItem",0),kinds.get("Button",0),kinds.get("Text",0)
     ),flush=True)
+    # Diagnostic metadata, deliberately boolean-only. Do not expose free-form
+    # text, AutomationIds, window titles, account names or masked emails.
+    for i, item in enumerate(
+        [x for x in challenge_controls() if ctype(x) in ("MenuItem", "RadioButton", "ListItem")][:8]
+    ):
+        raw = label(item)
+        meta = getattr(item, "element_info", None)
+        aid = str(getattr(meta, "automation_id", "") or "").lower()
+        hint = str(getattr(meta, "help_text", "") or "").lower()
+        try:
+            nested = [label(y) for y in item.descendants() if ctype(y) in ("Text", "Button", "Hyperlink")]
+        except Exception:
+            nested = []
+        print("SAFE_2FA_CHOICE_SHAPE_%d: kind=%s, named=%s, name_email=%s, id_email=%s, help_email=%s, children=%d, child_email=%s" % (
+            i,ctype(item),bool(raw),bool(re.search(r"e-?mail|이메일",raw)),
+            bool(re.search(r"e-?mail|이메일",aid)),bool(re.search(r"e-?mail|이메일",hint)),
+            len(nested),any(bool(re.search(r"e-?mail|이메일",n)) for n in nested)),
+            flush=True)
 
 
 def find_email_method(cs):
@@ -391,6 +409,20 @@ def find_email_method(cs):
         if ctype(control) not in eligible:
             continue
         name = label(control)
+        # UIA sometimes exposes a verification method through AutomationId
+        # or HelpText rather than Name. Accept these only for an existing
+        # in-page Roblox method control, with the same exclusion rules.
+        info = getattr(control, "element_info", None)
+        alt = [
+            str(getattr(info, "automation_id", "") or "").strip().lower(),
+            str(getattr(info, "help_text", "") or "").strip().lower(),
+        ]
+        if not email.search(name) and any(
+            email.search(x) and not excluded.search(x) and len(x) <= 120
+            for x in alt
+        ):
+            name = next(x for x in alt
+                        if email.search(x) and not excluded.search(x) and len(x) <= 120)
         if not name:
             try:
                 names = [
