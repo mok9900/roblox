@@ -7,6 +7,9 @@ on:
       - ci/assisted/login-ui.py
       - ci/assisted/native-studio-login.py
       - ci/assisted/visual-browser-login.py
+      - ci/assisted/probe-editor-cli.py
+      - ci/assisted/activate-mcp-ui.py
+      - ci/assisted/session.ps1
       - ci/assisted/tests/test_email_method.py
       - .github/workflows/test-roblox-auth-selector.yml
   workflow_dispatch:
@@ -22,6 +25,24 @@ jobs:
         with:
           python-version: '3.12'
       - name: Compile Python GUI login selector
-        run: python -m py_compile ci/assisted/login-ui.py ci/assisted/native-studio-login.py ci/assisted/visual-browser-login.py
+        run: python -m py_compile ci/assisted/login-ui.py ci/assisted/native-studio-login.py ci/assisted/visual-browser-login.py ci/assisted/probe-editor-cli.py ci/assisted/activate-mcp-ui.py
       - name: Test email-only selection, nested labels, and ambiguous choices
         run: python -m unittest discover -s ci/assisted/tests -p 'test_email_method.py' -v
+
+  powershell-static-parse:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse unattended GUI session PowerShell without execution
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          $path = (Resolve-Path '.\\ci\\assisted\\session.ps1').Path
+          [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | ForEach-Object { Write-Error $_.Message }
+            throw 'SESSION_PS1_SYNTAX_INVALID'
+          }
+          Write-Host 'SESSION_PS1_SYNTAX_VERIFIED'
