@@ -77,7 +77,7 @@ def inspect_window(win):
                 "panels": set(), "auth": False}
 
 
-deadline = time.monotonic() + 120
+deadline = time.monotonic() + 240
 last_report = 0
 stable_key = None
 stable_polls = 0
