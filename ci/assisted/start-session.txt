@@ -33,3 +33,4 @@ Retry 2026-11-18: prefer native Studio UI via one safe pre-credential restart; e
 Retry 2026-11-18 final validation: strict verified 3-edit official Roblox code challenge detection; Gmail run-bound encrypted OTP; validate stable Place editor ribbon and official Studio Assistant MCP without guessing UI targets.
 Retry 2026-11-18: isolated Studio-only authentication verification to avoid stale Edge browser challenge false negatives; verified encrypted Gmail email OTP; stable Place editor and MCP tunnel checks.
 Retry 2026-11-18: Studio-only OTP login proven, editor UI generated 3 ribbon tabs just before old 120s timeout; extend to 240s and validate official Assistant MCP toggle and secure tunnel.
+Retry 2026-11-18: verified Studio local Baseplate open, check official MCP launcher before UI activation; top-right Assistant via UI AutomationId/help-text; tunnel doctor and list_roblox_studios, no user games touched.
