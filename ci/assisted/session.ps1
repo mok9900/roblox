@@ -38,7 +38,9 @@ if ($nativeResult -eq 10) {
     $nativeResult = $LASTEXITCODE
 }
 if ($nativeResult -eq 10) {
-    Write-Host 'NATIVE_STUDIO_UNAVAILABLE_AFTER_RESTART: using guarded WGC/Edge only if unique verified controls exist.'
+    Write-Host 'NATIVE_STUDIO_UNAVAILABLE_AFTER_RESTART: validating official URI handler before guarded Edge login.'
+    ./ci/assisted/check-studio-auth-protocol.ps1 -RequireRegistered
+    Write-Host 'STUDIO_BROWSER_OAUTH_SAFE_TO_START: Windows protocol handler and Edge allowlist configured.'
     python .\ci\assisted\visual-browser-login.py
     if ($LASTEXITCODE -ne 0) {
         throw 'Visual Roblox browser sign-in failed closed; no blind credentials retry.'
