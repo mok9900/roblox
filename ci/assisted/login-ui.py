@@ -484,7 +484,7 @@ def find_email_method(cs):
     # Roblox may show a masked destination without spelling out "email".
     # Only a MASKED address inside a Roblox verified challenge may match.
     email = re.compile(
-        r"e-?mail|이메일|[a-z0-9._+-]{0,6}(?:\\*|•|·){2,}[a-z0-9._+-]{0,6}"
+        r"e-?mail|이메일|[a-z0-9._+-]{0,6}(?:\*|•|·){2,}[a-z0-9._+-]{0,6}"
         r"@[a-z0-9.-]+\.[a-z]{2,}",
         re.I,
     )
