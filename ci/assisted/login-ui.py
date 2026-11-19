@@ -455,8 +455,8 @@ def safe_choice_diagnostics():
         print("SAFE_2FA_CHOICE_SHAPE_%d: kind=%s, named=%s, name_email=%s, id_email=%s, help_email=%s, children=%d, child_email=%s, categories=%s" % (
             i,ctype(item),bool(raw),bool(re.search(r"e-?mail|이메일",raw)),
             bool(re.search(r"e-?mail|이메일",aid)),bool(re.search(r"e-?mail|이메일",hint)),
-            len(nested),any(bool(re.search(r"e-?mail|이메일",n)) for n in nested)),
-            ",".join(tags) or "unclassified",flush=True)
+            len(nested),any(bool(re.search(r"e-?mail|이메일",n)) for n in nested),
+            ",".join(tags) or "unclassified"),flush=True)
 
 
 def find_email_method(cs):
