@@ -116,6 +116,22 @@ class EmailMethodSelectionTest(unittest.TestCase):
             Control("MenuItem", "Backup code"), target
         ]), target)
 
+    def test_generic_named_menuitem_with_email_text_descendant(self):
+        target = Control("MenuItem", "Choose a method",
+                         children=[Control("Text", "Send code to Email")])
+        self.assertIs(find_email_method([target]), target)
+
+    def test_generic_named_menuitem_with_ambiguous_email_descendants(self):
+        target = Control("MenuItem", "Choose a method",
+                         children=[Control("Text", "Email"),
+                                   Control("Text", "Email code")])
+        self.assertIsNone(find_email_method([target]))
+
+    def test_account_settings_parent_with_nested_email_is_rejected(self):
+        target = Control("MenuItem", "Change account settings",
+                         children=[Control("Text", "Email")])
+        self.assertIsNone(find_email_method([target]))
+
     def test_korean_email_option(self):
         target = Control("RadioButton", "이메일로 코드 받기")
         self.assertIs(find_email_method([target]), target)
