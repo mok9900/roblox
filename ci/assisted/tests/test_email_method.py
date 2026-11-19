@@ -1,5 +1,7 @@
 """Credential-free tests for Roblox Studio email method selection."""
 import ast
+import io
+import contextlib
 import pathlib
 import re
 import unittest
@@ -8,7 +10,7 @@ import unittest
 SOURCE = pathlib.Path(__file__).resolve().parents[1] / "login-ui.py"
 tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
 selectors = [n for n in tree.body if isinstance(n, ast.FunctionDef)
-             and n.name in ("find_email_method", "in_browser_content", "find_code_edit", "find_browser_handoff", "find_protocol_consent")]
+             and n.name in ("find_email_method", "safe_choice_diagnostics", "in_browser_content", "find_code_edit", "find_browser_handoff", "find_protocol_consent")]
 
 
 class Control:
@@ -27,6 +29,9 @@ scope = {
     "label": lambda c: c.name,
     "VERIFY": re.compile(r"^(?:verify|confirm|continue|submit|next|인증|확인|계속|다음)$", re.I),
     "CODE": re.compile(r"verification code|email code|enter code|security code|6.digit|one.time code|인증 코드|이메일 코드|코드 입력", re.I),
+    "_controls": [],
+    "challenge_controls": lambda: scope["_controls"],
+
 }
 exec(compile(ast.Module(body=selectors, type_ignores=[]), str(SOURCE), "exec"), scope)
 find_email_method = scope["find_email_method"]
@@ -34,6 +39,27 @@ in_browser_content = scope["in_browser_content"]
 find_code_edit = scope["find_code_edit"]
 find_browser_handoff = scope["find_browser_handoff"]
 find_protocol_consent = scope["find_protocol_consent"]
+
+
+
+class Safe2FADiagnosticsTest(unittest.TestCase):
+    def test_method_categories_are_safe_and_formatting_succeeds(self):
+        scope["_controls"] = [
+            Control("Button", "Cancel"),
+            Control("MenuItem", "Use authenticator app"),
+            Control("MenuItem", "Backup code"),
+            Control("Edit", "Username"),
+        ]
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            scope["safe_choice_diagnostics"]()
+        text = output.getvalue()
+        self.assertIn("SAFE_2FA_CHOICE_SHAPE_0", text)
+        self.assertIn("categories=authenticator", text)
+        self.assertIn("categories=backup", text)
+        self.assertNotIn("use authenticator app", text)
+        self.assertNotIn("backup code", text)
+        scope["_controls"] = []
 
 
 class EmailMethodSelectionTest(unittest.TestCase):
