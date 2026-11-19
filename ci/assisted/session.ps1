@@ -38,6 +38,7 @@ if ($nativeResult -eq 10) {
     $nativeResult = $LASTEXITCODE
 }
 if ($nativeResult -eq 10) {
+    $env:ROBLOX_LOGIN_MODE = 'browser'
     Write-Host 'NATIVE_STUDIO_UNAVAILABLE_AFTER_RESTART: validating official URI handler before guarded Edge login.'
     ./ci/assisted/check-studio-auth-protocol.ps1 -RequireRegistered
     Write-Host 'STUDIO_BROWSER_OAUTH_SAFE_TO_START: Windows protocol handler and Edge allowlist configured.'
@@ -47,6 +48,8 @@ if ($nativeResult -eq 10) {
     }
 } elseif ($nativeResult -ne 0) {
     throw 'Native Studio login form failed safe validation; aborting without blind input.'
+} else {
+    $env:ROBLOX_LOGIN_MODE = 'native'
 }
 $env:ROBLOX_PRIMARY_SUBMITTED = '1'
 Write-Host 'Continuing official Roblox app approval or encrypted Gmail 2FA.'
