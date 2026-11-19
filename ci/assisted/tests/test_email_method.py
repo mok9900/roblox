@@ -10,7 +10,7 @@ import unittest
 SOURCE = pathlib.Path(__file__).resolve().parents[1] / "login-ui.py"
 tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
 selectors = [n for n in tree.body if isinstance(n, ast.FunctionDef)
-             and n.name in ("find_email_method", "safe_choice_diagnostics", "in_browser_content", "find_code_edit", "find_browser_handoff", "find_protocol_consent")]
+             and n.name in ("find_email_method", "select_challenge_host", "safe_choice_diagnostics", "in_browser_content", "find_code_edit", "find_browser_handoff", "find_protocol_consent")]
 
 
 class Control:
@@ -60,6 +60,46 @@ class Safe2FADiagnosticsTest(unittest.TestCase):
         self.assertNotIn("use authenticator app", text)
         self.assertNotIn("masked@", text)
         scope["_controls"] = []
+
+
+
+class ChallengeHostSelectionTest(unittest.TestCase):
+    def test_native_login_does_not_inspect_stale_roblox_edge(self):
+        native = object()
+        stale_edge = object()
+        self.assertEqual(scope["select_challenge_host"](
+            [stale_edge], [native], "native"), ("studio", native))
+
+    def test_browser_login_uses_browser_not_studio(self):
+        native = object()
+        official_edge = object()
+        self.assertEqual(scope["select_challenge_host"](
+            [official_edge], [native], "browser"), ("edge", official_edge))
+
+    def test_ambiguous_browser_windows_never_selected(self):
+        self.assertEqual(scope["select_challenge_host"](
+            [object(), object()], [object()], "browser"), (None, None))
+
+    def test_native_login_with_multiple_studio_windows_never_selected(self):
+        self.assertEqual(scope["select_challenge_host"](
+            [], [object(), object()], "native"), (None, None))
+
+
+class MaskedEmailChoiceTest(unittest.TestCase):
+    def test_unique_masked_email_destination(self):
+        target = Control("MenuItem", "Send code to s***@gmail.com")
+        self.assertIs(find_email_method([target]), target)
+
+    def test_unmasked_email_address_without_explicit_email_label_is_rejected(self):
+        target = Control("MenuItem", "Send code to example@gmail.com")
+        self.assertIsNone(find_email_method([target]))
+
+    def test_multiple_masked_destinations_rejected(self):
+        self.assertIsNone(find_email_method([
+            Control("MenuItem", "To s***@gmail.com"),
+            Control("MenuItem", "To z***@outlook.com"),
+        ]))
+
 
 
 class EmailMethodSelectionTest(unittest.TestCase):
