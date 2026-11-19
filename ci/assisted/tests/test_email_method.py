@@ -58,7 +58,7 @@ class Safe2FADiagnosticsTest(unittest.TestCase):
         self.assertIn("categories=authenticator", text)
         self.assertIn("categories=backup", text)
         self.assertNotIn("use authenticator app", text)
-        self.assertNotIn("backup code", text)
+        self.assertNotIn("masked@", text)
         scope["_controls"] = []
 
 
