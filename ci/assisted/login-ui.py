@@ -132,6 +132,19 @@ def in_browser_content(control_rect, window_rect):
         return False
 
 
+def select_challenge_host(edge, studio, mode):
+    """Pure selection: only the host which submitted primary credentials.
+
+    Reject ambiguous multi-window and stale-browser states. The calling
+    function separately verifies process, visibility and Roblox title.
+    """
+    if mode == "native" and len(studio) == 1:
+        return "studio", studio[0]
+    if len(edge) == 1 and (mode == "browser" or not studio):
+        return "edge", edge[0]
+    return None, None
+
+
 def challenge_controls():
     """Inspect only the official UI that initiated this login session.
 
@@ -158,22 +171,17 @@ def challenge_controls():
             pass
 
     mode = os.environ.get("ROBLOX_LOGIN_MODE", "native")
-    if mode == "native" and len(studio) == 1:
-        try:
-            return [c for c in studio[0].descendants() if c.is_visible()]
-        except Exception:
-            return []
-    # The browser is authoritative only for a verified browser-first login,
-    # or when the Studio host actually closed. Never mix controls from two
-    # simultaneous challenge surfaces.
-    if len(edge) == 1 and (mode == "browser" or not studio):
-        try:
-            bounds = edge[0].rectangle()
-            return [c for c in edge[0].descendants()
-                    if c.is_visible() and in_browser_content(c.rectangle(), bounds)]
-        except Exception:
-            return []
-    return []
+    source, window = select_challenge_host(edge, studio, mode)
+    if window is None:
+        return []
+    try:
+        if source == "studio":
+            return [c for c in window.descendants() if c.is_visible()]
+        bounds = window.rectangle()
+        return [c for c in window.descendants()
+                if c.is_visible() and in_browser_content(c.rectangle(), bounds)]
+    except Exception:
+        return []
 
 
 def success(cs):
@@ -632,7 +640,7 @@ if success(studio_only_controls()):
     sys.exit(0)
 submitted = os.environ.get("ROBLOX_PRIMARY_SUBMITTED") == "1"
 if submitted:
-    print("ROBLOX_PRIMARY_LOGIN_ALREADY_SUBMITTED: browser WGC/SendInput stage completed.",flush=True)
+    print("ROBLOX_PRIMARY_LOGIN_ALREADY_SUBMITTED: verified %s login GUI stage completed." % os.environ.get("ROBLOX_LOGIN_MODE","unknown"),flush=True)
 else:
     submitted = submit_primary_login()
 USER = ""
