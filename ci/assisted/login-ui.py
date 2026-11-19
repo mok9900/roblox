@@ -544,7 +544,13 @@ def choose_email():
     """Use official Roblox email 2FA choice, never Edge's toolbar menu."""
     alternatives_opened = False
     for stage in range(16):
+        if success(studio_only_controls()):
+            print("STUDIO_LOGIN_UI_VERIFIED_DURING_EMAIL_DISCOVERY", flush=True)
+            return True
         cs = challenge_controls()
+        if cs and find_code_edit(cs):
+            print("EMAIL_DEFAULT_CODE_FORM_FOUND_DURING_DISCOVERY", flush=True)
+            return True
         if not cs:
             if stage % 4 == 0:
                 print("ROBLOX_2FA_PAGE_NOT_ACCESSIBLE: browser content not ready.", flush=True)
@@ -649,58 +655,70 @@ if page and find_code_edit(page):
     print("EMAIL_DEFAULT_METHOD_SUCCEEDED.", flush=True)
     sys.exit(0)
 
-print("APP_APPROVAL_PENDING: open Roblox mobile app NOW and approve this sign-in promptly.", flush=True)
-start = time.monotonic()
-app_deadline = start + 50
-challenge_detected = False
-notice_time = 0
-while time.monotonic() < app_deadline:
-    cs = controls()
-    if success(studio_only_controls()):
-        print("APP_APPROVAL_SUCCEEDED.", flush=True)
-        sys.exit(0)
-    labels = [label(c) for c in cs]
-    challenge_detected = challenge_detected or any(CHALLENGE.search(n) for n in labels)
-    if challenge_detected and time.monotonic() - notice_time > 12:
-        print("APP_APPROVAL_STILL_PENDING: approve through the Roblox app before the request expires.", flush=True)
-        notice_time = time.monotonic()
-    if any(EXPIRED.search(n) for n in labels):
-        print("APP_APPROVAL_EXPIRED: attempting official email alternative.", flush=True)
-        break
-    time.sleep(2)
-
-if not challenge_detected:
-    # No recognized 2FA screen: don't click unknown controls.
-    if await_studio(time.monotonic() + 10):
-        sys.exit(0)
-    raise SystemExit("VERIFICATION_SCREEN_NOT_RECOGNIZED")
-
-if await_studio(time.monotonic() + 3):
+# The account owner has enabled email 2FA. Prefer verified email challenge
+# controls *before* treating the second-device approval prompt as primary.
+# Roblox can independently require a second-device login confirmation on a
+# new/ephemeral Windows runner even with Email 2SV enabled. Do not bypass it.
+print("EMAIL_2FA_PRIORITY: checking official email code and method before device approval.", flush=True)
+email_selected = choose_email()
+if success(studio_only_controls()):
+    print("STUDIO_LOGIN_UI_VERIFIED_AFTER_EMAIL_DISCOVERY", flush=True)
     sys.exit(0)
 
-print("APP_APPROVAL_NOT_CONFIRMED: checking official Roblox code form before opening alternatives.", flush=True)
-if find_code_edit(challenge_controls()):
-    print("EMAIL_CODE_FORM_READY: an existing official challenge input is uniquely identified.",flush=True)
-else:
-    if not choose_email():
-        raise SystemExit("EMAIL_METHOD_UNAVAILABLE: email option not accessible in Roblox challenge")
+# Roblox can show a second-device approval screen without an Email option
+# on certain new-device challenges. Wait for a user-approved official login
+# without repeatedly submitting the password or clicking unknown controls.
+if not email_selected:
+    print("EMAIL_2FA_NOT_OFFERED_BY_CURRENT_CHALLENGE: checking independent device approval.", flush=True)
+    deadline = time.monotonic() + 55
+    last_notice = 0
+    while time.monotonic() < deadline:
+        if success(studio_only_controls()):
+            print("APP_APPROVAL_SUCCEEDED.", flush=True)
+            sys.exit(0)
+        page = challenge_controls()
+        if find_code_edit(page):
+            print("EMAIL_CODE_FORM_READY_AFTER_DEVICE_CHALLENGE", flush=True)
+            email_selected = True
+            break
+        # A delayed official email option can appear after an initial
+        # security challenge. Click only if uniquely and explicitly labeled.
+        method = find_email_method(page)
+        if method is not None:
+            try:
+                method.click_input()
+                print("EMAIL_METHOD_SELECTED_AFTER_DEVICE_CHALLENGE", flush=True)
+                email_selected = True
+                break
+            except Exception:
+                pass
+        if time.monotonic()-last_notice >= 14:
+            print("DEVICE_APPROVAL_PENDING: email option not exposed; official user approval may be required.", flush=True)
+            last_notice = time.monotonic()
+        time.sleep(2)
+if not email_selected:
+    if await_studio(time.monotonic() + 8):
+        sys.exit(0)
+    raise SystemExit("OFFICIAL_EMAIL_CHALLENGE_NOT_OFFERED: no email code field or unique email method; device approval not confirmed")
 
-print("EMAIL_METHOD_SELECTED: checking whether Roblox actually displayed an OTP input.", flush=True)
-code_form_deadline = time.monotonic() + 30
-while time.monotonic() < code_form_deadline:
+# Email method selected or code form already present. Never assume a click
+# succeeded in delivering mail; the official code input must actually exist.
+code_deadline = time.monotonic() + 35
+while time.monotonic() < code_deadline:
+    if success(studio_only_controls()):
+        print("STUDIO_LOGIN_COMPLETED_WHILE_WAITING_FOR_CODE_FORM", flush=True)
+        sys.exit(0)
     if find_code_edit(challenge_controls()):
         break
     time.sleep(2)
 else:
-    raise SystemExit("EMAIL_OTP_INPUT_NOT_PRESENT: the selected email action may be address verification instead of an OTP challenge")
+    raise SystemExit("EMAIL_CODE_FORM_NOT_PRESENT_AFTER_OFFICIAL_CHALLENGE")
 
-print("EMAIL_CODE_FORM_READY: a verification-code input is accessible.", flush=True)
-print("OTP_RELAY_READY: encrypted one-time code can be delivered through run-bound GitHub relay.", flush=True)
+print("EMAIL_CODE_FORM_READY: uniquely accessible official Roblox verification input.", flush=True)
+print("OTP_RELAY_READY: awaiting per-run RSA-encrypted Gmail verification code.", flush=True)
 code = wait_for_code(timeout=540)
 enter_code(code)
-code = ""  # do not retain code longer than needed
-
-if not await_studio(time.monotonic() + 75):
-    raise SystemExit("EMAIL_CODE_SUBMITTED_BUT_LOGIN_NOT_VERIFIED")
-
-print("EMAIL_FALLBACK_SUCCEEDED.", flush=True)
+code = ""
+if not await_studio(time.monotonic() + 90):
+    raise SystemExit("EMAIL_CODE_SUBMITTED_BUT_STUDIO_LOGIN_NOT_VERIFIED")
+print("EMAIL_2FA_STUDIO_LOGIN_SUCCEEDED.", flush=True)
