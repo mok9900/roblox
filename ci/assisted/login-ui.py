@@ -520,17 +520,22 @@ def find_email_method(cs):
         ):
             name = next(x for x in alt
                         if email.search(x) and not excluded.search(x) and len(x) <= 120)
-        if not name:
+        if not email.search(name) or excluded.search(name):
             try:
+                # Even a generic nonempty MenuItem name ("Choose method")
+                # may contain a child Text that uniquely identifies Email.
+                # The old code checked descendants ONLY for empty names.
                 names = [
                     label(child) for child in control.descendants()
                     if ctype(child) in ("Text", "Button", "Hyperlink")
                 ]
-                names = [n for n in names if n and len(n) <= 120]
-                if len([n for n in names if email.search(n) and not excluded.search(n)]) == 1:
-                    name = next(n for n in names if email.search(n) and not excluded.search(n))
+                hits = [n for n in names
+                        if n and len(n) <= 120 and email.search(n)
+                        and not excluded.search(n)]
+                if len(hits) == 1 and not excluded.search(name):
+                    name = hits[0]
             except Exception:
-                continue
+                pass
         if not name or len(name) > 120:
             continue
         if email.search(name) and not excluded.search(name):
