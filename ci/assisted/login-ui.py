@@ -133,10 +133,13 @@ def in_browser_content(control_rect, window_rect):
 
 
 def challenge_controls():
-    """Inspect Roblox Edge page or a single official native Studio window.
+    """Inspect only the official UI that initiated this login session.
 
-    Browser chrome is excluded by geometry. Native Studio may use a built-in
-    email-code challenge instead of a separate Edge verification page.
+    The previous implementation prioritized ANY Roblox-titled Edge window,
+    even after an official native Studio form had submitted the credentials.
+    That stale browser page could hide the real email verification controls.
+    The shell now tells us which *verified* primary login was submitted, so
+    we prefer its corresponding challenge host rather than an unrelated page.
     """
     pmap = {p.info["pid"]: (p.info.get("name") or "").lower()
             for p in psutil.process_iter(attrs=("pid", "name"))}
@@ -153,18 +156,21 @@ def challenge_controls():
                 studio.append(window)
         except Exception:
             pass
-    if len(edge) == 1:
+
+    mode = os.environ.get("ROBLOX_LOGIN_MODE", "native")
+    if mode == "native" and len(studio) == 1:
+        try:
+            return [c for c in studio[0].descendants() if c.is_visible()]
+        except Exception:
+            return []
+    # The browser is authoritative only for a verified browser-first login,
+    # or when the Studio host actually closed. Never mix controls from two
+    # simultaneous challenge surfaces.
+    if len(edge) == 1 and (mode == "browser" or not studio):
         try:
             bounds = edge[0].rectangle()
             return [c for c in edge[0].descendants()
                     if c.is_visible() and in_browser_content(c.rectangle(), bounds)]
-        except Exception:
-            return []
-    if len(edge) > 1:
-        return []
-    if len(studio) == 1:
-        try:
-            return [c for c in studio[0].descendants() if c.is_visible()]
         except Exception:
             return []
     return []
