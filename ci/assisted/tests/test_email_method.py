@@ -93,6 +93,18 @@ class EmailMethodSelectionTest(unittest.TestCase):
         })()
         self.assertIsNone(find_email_method([target]))
 
+    def test_unique_email_value_pattern_is_accepted(self):
+        target = Control("MenuItem", "Verification method")
+        target.get_value = lambda: "Send verification code to Email"
+        self.assertIs(find_email_method([
+            target, Control("MenuItem", "Backup code")
+        ]), target)
+
+    def test_account_email_settings_value_is_rejected(self):
+        target = Control("MenuItem", "Verification method")
+        target.get_value = lambda: "Change Email in account settings"
+        self.assertIsNone(find_email_method([target]))
+
     def test_no_clickable_email_choice_is_rejected(self):
         self.assertIsNone(find_email_method([
             Control("Text", "Email"), Control("Button", "More options")
