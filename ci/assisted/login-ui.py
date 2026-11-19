@@ -452,7 +452,7 @@ def safe_choice_diagnostics():
             "authenticator": r"authenticator|인증 앱",
             "backup": r"backup|recovery|백업|복구",
             "sms": r"phone|sms|text message|휴대전화|문자",
-            "email": r"e-?mail|이메일",
+            "email": r"e-?mail|이메일|(?:\\*|•|·){2,}.{0,30}@",
             "captcha": r"captcha|arkose|보안 확인",
             "one_time_code": r"one.time code|일회용 코드",
         }
@@ -473,7 +473,13 @@ def find_email_method(cs):
     menu item based on its position or an unverified bounding box.
     """
     eligible = ("MenuItem", "RadioButton", "ListItem", "Button", "Hyperlink")
-    email = re.compile(r"e-?mail|이메일", re.I)
+    # Roblox may show a masked destination without spelling out "email".
+    # Only a MASKED address inside a Roblox verified challenge may match.
+    email = re.compile(
+        r"e-?mail|이메일|[a-z0-9._+-]{0,6}(?:\\*|•|·){2,}[a-z0-9._+-]{0,6}"
+        r"@[a-z0-9.-]+\\.[a-z]{2,}",
+        re.I,
+    )
     excluded = re.compile(
         r"settings|change|remove|disable|account recovery|"
         r"설정|변경|삭제|복구", re.I
