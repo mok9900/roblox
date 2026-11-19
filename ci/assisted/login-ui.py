@@ -409,6 +409,19 @@ def safe_choice_diagnostics():
                 safe.add(f"{typ}:{n}")
         elif typ == "Edit":
             e += 1
+    credential_edit_labels = [
+        label(c) for c in challenge_controls() if ctype(c) == "Edit"
+    ]
+    prior_login_fields = (
+        any(re.search(r"username|user name|사용자 이름", n) for n in credential_edit_labels)
+        and any(re.search(r"password|비밀번호", n) for n in credential_edit_labels)
+    )
+    official_captcha_hint = any(
+        re.search(r"captcha|arkose|challenge verification|보안 문자|보안 확인", label(c), re.I)
+        for c in challenge_controls()
+    )
+    print("SAFE_2FA_CONTEXT: primary_form_still_exposed=%s captcha_hint=%s" %
+          (prior_login_fields, official_captcha_hint), flush=True)
     print("SAFE_2FA_UI: " + ", ".join(sorted(safe)[:32]), flush=True)
     print("SAFE_2FA_UI_COUNTS: edits=%d menuitems=%d radios=%d listitems=%d buttons=%d texts=%d" % (
         e,kinds.get("MenuItem",0),kinds.get("RadioButton",0),
@@ -427,11 +440,23 @@ def safe_choice_diagnostics():
             nested = [label(y) for y in item.descendants() if ctype(y) in ("Text", "Button", "Hyperlink")]
         except Exception:
             nested = []
-        print("SAFE_2FA_CHOICE_SHAPE_%d: kind=%s, named=%s, name_email=%s, id_email=%s, help_email=%s, children=%d, child_email=%s" % (
+        categories = {
+            "passkey": r"passkey|패스키|security key|보안 키",
+            "device": r"another device|other device|다른 기기|quick login|빠른 로그인",
+            "authenticator": r"authenticator|인증 앱",
+            "backup": r"backup|recovery|백업|복구",
+            "sms": r"phone|sms|text message|휴대전화|문자",
+            "email": r"e-?mail|이메일",
+            "captcha": r"captcha|arkose|보안 확인",
+            "one_time_code": r"one.time code|일회용 코드",
+        }
+        tags = [key for key, phrase in categories.items()
+                if re.search(phrase, raw + " " + aid + " " + hint, re.I)]
+        print("SAFE_2FA_CHOICE_SHAPE_%d: kind=%s, named=%s, name_email=%s, id_email=%s, help_email=%s, children=%d, child_email=%s, categories=%s" % (
             i,ctype(item),bool(raw),bool(re.search(r"e-?mail|이메일",raw)),
             bool(re.search(r"e-?mail|이메일",aid)),bool(re.search(r"e-?mail|이메일",hint)),
             len(nested),any(bool(re.search(r"e-?mail|이메일",n)) for n in nested)),
-            flush=True)
+            ",".join(tags) or "unclassified",flush=True)
 
 
 def find_email_method(cs):
@@ -460,6 +485,15 @@ def find_email_method(cs):
             str(getattr(info, "automation_id", "") or "").strip().lower(),
             str(getattr(info, "help_text", "") or "").strip().lower(),
         ]
+        # Some official Roblox menus expose a name only through the UIA
+        # ValuePattern. Inspect it exclusively as an in-memory category,
+        # never print or serialize the value (it could contain masked email).
+        try:
+            value = str(control.get_value() or "").strip().lower()
+            if len(value) <= 120:
+                alt.append(value)
+        except Exception:
+            pass
         if not email.search(name) and any(
             email.search(x) and not excluded.search(x) and len(x) <= 120
             for x in alt
