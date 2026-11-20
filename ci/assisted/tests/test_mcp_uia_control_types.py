@@ -86,9 +86,14 @@ class MCPUIAControlTypeTests(unittest.TestCase):
         ctx = self.base()
         target_a = FakeControl("Assistant", "Button")
         target_b = FakeControl("Assistant", "Button")
-        ctx["controls"] = lambda: [target_a, target_b]
-        # Zero timeout means only a single probe: any duplicated choice is rejected.
-        self.assertFalse(ctx["click_unique"](re.compile("assistant"), timeout=0))
+        probed = []
+        def duplicate_controls():
+            probed.append(True)
+            return [target_a, target_b]
+        ctx["controls"] = duplicate_controls
+        # Actually run at least one selection pass with two matching buttons.
+        self.assertFalse(ctx["click_unique"](re.compile("assistant"), timeout=0.01))
+        self.assertGreaterEqual(len(probed), 1)
         self.assertEqual(target_a.click_count + target_b.click_count, 0)
 
     def test_reject_unrelated_text_as_toggle(self):
