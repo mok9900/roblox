@@ -17,6 +17,7 @@ on:
       - ci/assisted/tests/test_email_method.py
       - ci/assisted/tests/test_visual_twofactor.py
       - ci/assisted/tests/test_assistant_visual.py
+      - ci/assisted/tests/ocr_runtime_smoke.py
       - .github/workflows/test-roblox-auth-selector.yml
   workflow_dispatch:
 permissions:
@@ -58,3 +59,23 @@ jobs:
       - name: Apply and validate narrow temporary Edge Studio callback policy
         shell: pwsh
         run: ./ci/assisted/configure-edge.ps1
+  
+  assistant-ocr-runtime:
+    name: Windows offline Assistant OCR integration (no credentials)
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install same optional local OCR dependencies as authenticated session
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --quiet 'rapidocr==3.10.0' 'onnxruntime>=1.18,<2' 'Pillow>=11,<13'
+          if ($LASTEXITCODE -ne 0) { throw 'ASSISTANT_OCR_RUNTIME_INSTALL_FAILED' }
+      - name: Verify in-memory synthetic Assistant label recognition
+        shell: pwsh
+        run: |
+          python .\\ci\\assisted\\tests\\ocr_runtime_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw 'ASSISTANT_OCR_RUNTIME_SMOKE_FAILED' }
