@@ -18,3 +18,4 @@ Run browser process/UIA diagnostics on 2026-11-17 19:05 KST after guarded WGC+Se
 
 2026-11-17 19:16 KST: focus Studio before blue CTA WGC detection after Edge renderer accessibility prelaunch.
 2026-11-18: reproduce pre-Studio Edge priming, credential-free WGC blue login CTA probe.
+2026-11-21: Recheck GitHub-hosted windows-2022 and windows-2025 WGC/DXGI + SendInput credential-free graphics diagnostics after UIA type regression fix. No Roblox login or Gmail OAuth required.
