@@ -1,5 +1,7 @@
 """Credential-free synthetic Gmail 2FA parser tests. Never contact Gmail."""
 import base64
+import io
+import urllib.error
 import importlib.util
 import pathlib
 import unittest
@@ -74,6 +76,32 @@ class GmailCodeTests(unittest.TestCase):
             "GMAIL_OAUTH_CLIENT_SECRET": "dummy",
             "GMAIL_OAUTH_REFRESH_TOKEN": "dummy"}, clear=True):
             self.assertTrue(mod.configured())
+
+    def test_google_invalid_client_is_safe_and_actionable(self):
+        error = urllib.error.HTTPError(
+            mod.TOKEN_URL, 401, "Unauthorized", {},
+            io.BytesIO(b'{"error":"invalid_client","error_description":"private detail"}'))
+        with patch.object(mod.urllib.request, "urlopen", side_effect=error):
+            with self.assertRaisesRegex(RuntimeError, "GMAIL_OAUTH_OR_API_INVALID_CLIENT") as ctx:
+                mod._json_request(mod.TOKEN_URL, form={"grant_type": "refresh_token"})
+        self.assertNotIn("private detail", str(ctx.exception))
+
+    def test_invalid_grant_is_separate_from_client_mismatch(self):
+        error = urllib.error.HTTPError(
+            mod.TOKEN_URL, 400, "Bad Request", {},
+            io.BytesIO(b'{"error":"invalid_grant"}'))
+        with patch.object(mod.urllib.request, "urlopen", side_effect=error):
+            with self.assertRaisesRegex(RuntimeError, "GMAIL_OAUTH_OR_API_INVALID_GRANT"):
+                mod._json_request(mod.TOKEN_URL, form={"grant_type": "refresh_token"})
+
+    def test_oauth_client_id_must_not_be_client_secret(self):
+        with patch.dict(mod.os.environ, {
+            "GMAIL_OAUTH_CLIENT_ID": "GOCSPX-demo",
+            "GMAIL_OAUTH_CLIENT_SECRET": "GOCSPX-demo",
+            "GMAIL_OAUTH_REFRESH_TOKEN": "refresh-demo"}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "CLIENT_ID_FORMAT_INVALID"):
+                mod._access_token()
+
 
 
 if __name__ == "__main__":
