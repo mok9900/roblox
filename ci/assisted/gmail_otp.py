@@ -29,7 +29,7 @@ SENDER = "accounts@roblox.com"
 CODE = re.compile(
     r"(?:2단계\s*인증\s*코드(?:는|가|:)?|"
     r"(?:one[- ]time|2[- ]step|two[- ]step|verification|security)\s*code\s*(?:is|:)?|"
-    r"인증\s*코드(?:는|가|:)?)\s*[:：]?\s*(\d{6})\b",
+    r"인증\s*코드(?:는|가|:)?)\s*[:：]?\s*(\d{6})(?!\d)",
     re.I,
 )
 
