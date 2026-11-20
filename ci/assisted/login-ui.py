@@ -553,9 +553,44 @@ def find_email_method(cs):
     return None
 
 
+
+def visual_email_choice():
+    """Guarded WGC/DXGI + SendInput fallback for the matched official host.
+
+    Runs only after the official Roblox 2FA UIA method search failed. A
+    screenshot is processed only in memory, and OCR words are never logged.
+    """
+    if os.environ.get("ROBLOX_PRIMARY_SUBMITTED") != "1":
+        return False
+    mode = os.environ.get("ROBLOX_LOGIN_MODE", "")
+    if mode not in ("native", "browser"):
+        return False
+    try:
+        from visual_twofactor import try_visual_email
+        pmap = {p.info["pid"]: (p.info.get("name") or "").lower()
+                for p in psutil.process_iter(attrs=("pid", "name"))}
+        edge, studio = [], []
+        for window in Desktop(backend="uia").windows():
+            if not window.is_visible():
+                continue
+            exe = pmap.get(window.element_info.process_id, "")
+            if exe == "msedge.exe" and "roblox" in (window.window_text() or "").lower():
+                edge.append(window)
+            if exe == "robloxstudiobeta.exe":
+                studio.append(window)
+        _, win = select_challenge_host(edge, studio, mode)
+        if win is None:
+            return False
+        return try_visual_email(win, challenge_controls())
+    except Exception:
+        print("VISUAL_2FA_DIAG: safe_visual_discovery_unavailable", flush=True)
+        return False
+
+
 def choose_email():
     """Use official Roblox email 2FA choice, never Edge's toolbar menu."""
     alternatives_opened = False
+    visual_attempted = False
     for stage in range(16):
         if success(studio_only_controls()):
             print("STUDIO_LOGIN_UI_VERIFIED_DURING_EMAIL_DISCOVERY", flush=True)
@@ -593,6 +628,16 @@ def choose_email():
                     safe_choice_diagnostics()
                 except Exception:
                     pass
+        # Accessibility labels may be missing in the official challenge.
+        # Only when its alternative-method menu is already open, run a
+        # bounded, one-shot in-memory visual probe. It may click ONE UIA
+        # target if OCR strongly verifies an Email choice across two frames.
+        if alternatives_opened and not visual_attempted:
+            visual_attempted = True
+            if visual_email_choice():
+                print("EMAIL_METHOD_SELECTED: visually verified official email choice.", flush=True)
+                time.sleep(3)
+                return True
         time.sleep(2)
     safe_choice_diagnostics()
     return False
