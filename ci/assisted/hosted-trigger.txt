@@ -1,0 +1,1 @@
+2026-11-21 GitHub-hosted-only official Windows actions preflight; no self-hosted runner. Credential presence and Gmail readonly token checks occur before Roblox sign-in. Stop safely on missing secrets.
