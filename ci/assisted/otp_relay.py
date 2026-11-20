@@ -72,6 +72,13 @@ def fetch_ciphertext(run_id):
 
 
 def wait_for_code(timeout=540):
+    # Prefer official Gmail OAuth read-only access when the owner has supplied
+    # all three GitHub Actions secrets. This runs INSIDE the hosted Windows
+    # runner; no OTP leaves the runner and no GitHub commit carries a code.
+    # Preserve the run-bound RSA relay for existing configurations only.
+    from gmail_otp import configured, wait_gmail_code
+    if configured():
+        return wait_gmail_code(timeout=timeout)
     run_id = os.environ["GITHUB_RUN_ID"]
     private_bytes = key_path().read_bytes()
     key = serialization.load_pem_private_key(private_bytes, password=None)
