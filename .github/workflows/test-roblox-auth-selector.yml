@@ -19,6 +19,7 @@ on:
       - ci/assisted/tests/test_email_method.py
       - ci/assisted/tests/test_visual_twofactor.py
       - ci/assisted/tests/test_assistant_visual.py
+      - ci/assisted/tests/test_persistent_session_contract.py
       - ci/assisted/tests/ocr_runtime_smoke.py
       - .github/workflows/test-roblox-auth-selector.yml
   workflow_dispatch:
