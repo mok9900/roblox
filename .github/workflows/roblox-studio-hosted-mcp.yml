@@ -1,5 +1,10 @@
 name: Roblox Studio MCP - GitHub-hosted Windows only
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - ci/assisted/hosted-trigger.txt
   workflow_dispatch:
     inputs:
       windows_runner:
@@ -20,7 +25,7 @@ jobs:
   github-hosted-roblox-mcp:
     name: Ephemeral Windows Roblox Studio → OpenAI Secure MCP Tunnel
     # No local/self-hosted runner or persistent Windows machine.
-    runs-on: ${{ inputs.windows_runner }}
+    runs-on: ${{ inputs.windows_runner || 'windows-2022' }}
     timeout-minutes: 330
     env:
       ROBLOX_USERNAME: ${{ secrets.ROBLOX_USERNAME }}
