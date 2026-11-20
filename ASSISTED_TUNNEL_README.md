@@ -231,3 +231,15 @@ Real Windows Actions [44490655426](https://github.com/mok9900/roblox/actions/run
 - Do not repeatedly retry a credential login merely to wait for email when Roblox has not issued an email-code challenge. The protected-screen diagnostic proposal was **not installed** and its temporary key material was discarded; the repository still contains only privacy-safe boolean/control-type diagnostics.
 
 Recommended next supported option: consider the first-party `Email Me a One-Time Code` initial sign-in flow if actually shown by Roblox, with the verified mailbox supplied securely (not committed to this public repository); Roblox states this separate passwordless login option is only available to some users. It is **not equivalent** to Email 2SV, and Roblox can still require other sign-in protection. For persistent automation, a user-controlled already-authenticated interactive Windows environment avoids repeated new-device challenges.
+
+## 2026-11-20 — Temporary WGC / DXGI + SendInput pilot
+
+User requested direct Windows graphics-assisted UI automation, preserving the final fully-scripted Studio MCP objective.
+
+Added ci/assisted/visual_twofactor.py: guarded first-party Roblox UI region capture through DXGI Desktop Duplication with WGC/WinRT fallback, volatile OCR selection of a unique Email entry within a real UI Automation control, confirmation on two frames and Win32 SendInput click only then. No screenshots or private text are logged or stored. The existing visual-browser-login.py already provides DXGI + SendInput guarded login CTA and form input.
+
+Added ci/assisted/tests/test_visual_twofactor.py; run 44654740648 passed 54 credential-free Python tests and Windows PowerShell checks: https://github.com/mok9900/roblox/actions/runs/44654740648
+
+An attempted optional RapidOCR dependency installation in the credentialed session was blocked by a tool safety check, so the new 2FA image-recognition path is not yet proven to function on hosted runners. This is an explicit limitation; the implementation safely refuses unknown target clicks.
+
+Real run 44655043493: https://github.com/mok9900/roblox/actions/runs/44655043493 . A fresh Roblox six-digit verification code arrived through connected Gmail, was encrypted using the run-specific public RSA artifact and delivered as encrypted GitHub Actions relay. A fresh new-login notification followed. The encrypted relay file was removed from the branch after the verification period; plaintext secrets were never stored in GitHub. At last check the combined login/MCP/tunnel job was still in progress, while list_roblox_studios showed the MCP tunnel not connected. Email notices alone are not sufficient to establish Studio editor or MCP success.
