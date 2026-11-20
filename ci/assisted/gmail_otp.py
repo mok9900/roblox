@@ -55,19 +55,46 @@ def _json_request(url, *, token=None, form=None):
         with urllib.request.urlopen(request, timeout=18) as res:
             return json.load(res)
     except urllib.error.HTTPError as exc:
-        raise RuntimeError("GMAIL_OAUTH_OR_API_HTTP_%d" % exc.code) from None
+        # Parse only Google's standardized error *code*, never the
+        # explanation or raw response body; those may contain account data.
+        # These safe categories distinguish mismatched OAuth credentials
+        # from an expired/revoked refresh token.
+        category = "HTTP_%d" % exc.code
+        try:
+            body = json.loads(exc.read(4096).decode("utf-8", errors="replace"))
+            name = body.get("error") if isinstance(body, dict) else None
+            if isinstance(name, str) and name in {
+                "invalid_client", "invalid_grant", "access_denied",
+                "unauthorized_client", "invalid_request",
+                "invalid_scope", "deleted_client", "disabled_client"
+            }:
+                category = name.upper()
+        except (ValueError, UnicodeError, OSError):
+            pass
+        raise RuntimeError("GMAIL_OAUTH_OR_API_%s" % category) from None
     except (urllib.error.URLError, TimeoutError):
         raise RuntimeError("GMAIL_OAUTH_OR_API_NETWORK_UNAVAILABLE") from None
 
 
 def _access_token():
+    # Fail before any network call when a Client Secret or Playground
+    # default ID was accidentally pasted into GMAIL_OAUTH_CLIENT_ID.
+    cid = os.environ["GMAIL_OAUTH_CLIENT_ID"].strip()
+    secret = os.environ["GMAIL_OAUTH_CLIENT_SECRET"].strip()
+    refresh = os.environ["GMAIL_OAUTH_REFRESH_TOKEN"].strip()
+    if cid.startswith("GOCSPX-") or not cid.endswith(".apps.googleusercontent.com"):
+        raise RuntimeError("GMAIL_OAUTH_CLIENT_ID_FORMAT_INVALID")
+    if not secret:
+        raise RuntimeError("GMAIL_OAUTH_CLIENT_SECRET_EMPTY")
+    if not refresh:
+        raise RuntimeError("GMAIL_OAUTH_REFRESH_TOKEN_EMPTY")
     response = _json_request(
         TOKEN_URL,
         form={
             "grant_type": "refresh_token",
-            "client_id": os.environ["GMAIL_OAUTH_CLIENT_ID"],
-            "client_secret": os.environ["GMAIL_OAUTH_CLIENT_SECRET"],
-            "refresh_token": os.environ["GMAIL_OAUTH_REFRESH_TOKEN"],
+            "client_id": cid,
+            "client_secret": secret,
+            "refresh_token": refresh,
         },
     )
     token = response.get("access_token")
