@@ -253,3 +253,28 @@ Real run 44655043493: https://github.com/mok9900/roblox/actions/runs/44655043493
 - User-authorized authenticated follow-up [44726022471](https://github.com/mok9900/roblox/actions/runs/44726022471) was started. A fresh official Roblox email 2FA challenge was issued and the run-specific RSA public key artifact was retrieved, but connector safety validation blocked writing the encrypted OTP relay back to the repository. No alternate path was used to circumvent the block. The new run therefore cannot be treated as authenticated or MCP-connected; allow the existing guarded OTP wait to exit naturally.
 - Direct `list_roblox_studios` returned `Tunnel-client has not been seen for 300 seconds`. Neither Assistant enablement nor OpenAI Tunnel handshake has been demonstrated.
 - Next supported step: use a persistent, user-authorized signed-in Windows Studio session to inspect and activate the official Assistant MCP switch, then verify `%LOCALAPPDATA%\\Roblox\\mcp.bat`, `tunnel-client doctor` and `list_roblox_studios`. Never bypass official Roblox verification or claim success based on a test-only OCR pass.
+
+## 2026-11-20: Persistent interactive Windows runner fallback
+
+Following run [44726022471](https://github.com/mok9900/roblox/actions/runs/44726022471),
+the hosted Windows 2FA flow reached the verified official Email code field
+but expired with `OTP_RELAY_TIMEOUT` (the encrypted OTP write was blocked).
+This is not a Roblox password failure and not a successful MCP connection.
+
+Added:
+- `ci/assisted/session-persistent.ps1`: fail-closed interactive desktop guard,
+  opens only a pinned local Baseplate, reuses the already signed-in Windows
+  account without Roblox password or OTP relay, activates official Assistant
+  MCP only when identifiable, requires official `mcp.bat` and tunnel doctor.
+- `.github/workflows/studio-openai-tunnel-persistent.yml`: **manual-only**
+  workflow for `[self-hosted, Windows, X64, roblox-studio-interactive]`.
+  Not usable on a default disposable GitHub-hosted runner.
+- `PERSISTENT_STUDIO_MCP_README.md`: one-time `config.cmd`/interactive
+  `run.cmd` instructions, security cautions and verification gates.
+- Unit tests reject credential/OTP injection into the persistent workflow;
+  PowerShell syntax is checked on Windows CI.
+
+This fallback has passed code-level checks, but has **not** been run on an
+actual user-provided interactive self-hosted runner. Live success requires
+a running official OpenAI tunnel client and a valid response from
+`list_roblox_studios`; no connection is claimed yet.
