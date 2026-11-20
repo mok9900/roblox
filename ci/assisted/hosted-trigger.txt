@@ -1,1 +1,3 @@
 2026-11-21 GitHub-hosted-only official Windows actions preflight; no self-hosted runner. Credential presence and Gmail readonly token checks occur before Roblox sign-in. Stop safely on missing secrets.
+
+2026-11-21 08:xx KST: owner confirms Client Secret rotation and completion of Gmail OAuth repository secrets. Run official GitHub-hosted Windows Actions preflight and, only on success, Studio sign-in, Gmail 2FA, Baseplate, Assistant MCP and tunnel. Never expose credentials or OTP.
