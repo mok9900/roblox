@@ -121,7 +121,7 @@ def tooltip_assistant():
     for w in Desktop(backend="uia").windows():
         try:
             if (w.is_visible() and w.element_info.control_type == "ToolTip"
-                    and w.element_info.process_id in studio_pids()):
+                    and w.element_info.process_id in studio_related_pids()):
                 name = (w.element_info.name or "").strip().lower()
                 if name in ("assistant", "어시스턴트"):
                     names.add(name)
@@ -205,18 +205,10 @@ def visible_assistant_tooltip():
                     continue
         except Exception:
             continue
-    # Some Roblox builds render a tooltip as a Studio-owned text child.
-    for win in studio_windows():
-        try:
-            for element in win.descendants():
-                if not element.is_visible():
-                    continue
-                if kind(element) in ("ToolTip", "Text") and (
-                    safe_name(element) in ("assistant", "어시스턴트")
-                ):
-                    return True
-        except Exception:
-            continue
+    # Do not enumerate thousands of Studio UIA descendants on EACH hover:
+    # that made the previous 50-point scan take more than 40 minutes.
+    # Custom-drawn Studio tooltips are handled by bounded, in-memory DXGI
+    # OCR in assistant_visual.py, with no screenshots persisted.
     return False
 
 
@@ -234,6 +226,15 @@ def hover_discover_assistant():
               len(editors), flush=True)
         return False
     win = editors[0]
+    # Native UIA cannot see the custom-drawn right mezzanine on this build.
+    # First try a bounded local DXGI-only visual tooltip check. The helper
+    # never clicks unless exact text appears twice after moving the pointer.
+    try:
+        from assistant_visual import try_visual_assistant
+        if try_visual_assistant(win):
+            return True
+    except Exception:
+        print("MCP_VISUAL_DIAG: optional_fast_path_unavailable", flush=True)
     try:
         wr = win.rectangle()
         if wr.width() < 700 or wr.height() < 500:
@@ -246,11 +247,14 @@ def hover_discover_assistant():
             print("MCP_HOVER_PREEXISTING_TOOLTIP: refusing ambiguous click.", flush=True)
             return False
         scanned = 0
+        max_until = time.monotonic() + 55
         # Known documented region: right side of the top mezzanine.
         # Only non-mutating mouse hover occurs until a unique tooltip
         # proves the target is Roblox Assistant.
-        for yoff in (42, 67, 92, 118, 144):
-            for fraction in (.60, .64, .68, .72, .76, .80, .84, .88, .92, .96):
+        for yoff in (43, 77, 111):
+            for fraction in (.60, .67, .74, .81, .88, .95):
+                if time.monotonic() > max_until:
+                    break
                 x = int(wr.left + wr.width()*fraction)
                 y = int(wr.top + yoff)
                 if not (wr.left < x < wr.right-14 and wr.top < y < wr.bottom):
