@@ -67,6 +67,12 @@ Write-Host "MCP_RUNTIME_SAFE_DIAG: official_launcher_present=$(Test-Path -Litera
 # MCP handshake before declaring success.
 if (-not (Test-Path -LiteralPath $mcpBatch)) {
     Write-Host 'MCP_LAUNCHER_MISSING: enabling official Studio MCP from Assistant UI.'
+    # OCR is local-only and used only on the signed-in, confirmed CI Baseplate
+    # editor mezzanine. No image, extracted text, account data or OTP is logged.
+    # The guarded Win32 tooltip fallback remains if optional OCR is unavailable.
+    Write-Host 'MCP_VISUAL_RUNTIME: installing optional offline OCR for custom-drawn Assistant tooltip.'
+    python -m pip install --disable-pip-version-check --quiet 'rapidocr==3.10.0' 'onnxruntime>=1.18,<2'
+    if ($LASTEXITCODE -ne 0) { Write-Host 'MCP_VISUAL_RUNTIME_UNAVAILABLE: continuing with strict native tooltip-only fallback.' }
     python .\ci\assisted\activate-mcp-ui.py
     if ($LASTEXITCODE -ne 0) { throw 'Studio MCP enable control not reachable via UI automation.' }
 } else {
