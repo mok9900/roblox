@@ -22,11 +22,13 @@ new-device/email-OTP challenge on every run.
    `OPENAI_TUNNEL_RUNTIME_KEY` and `OPENAI_TUNNEL_ID` configured.
    The persistent workflow deliberately does **not** read
    `ROBLOX_USERNAME`, `ROBLOX_PASSWORD`, Gmail or email OTP.
-5. From GitHub Actions, select
-   **Persistent signed-in Roblox Studio MCP Tunnel (interactive Windows)**
-   and click **Run workflow** on
-   `feature/studio-openai-tunnel-assisted`. There is **no automatic push
-   trigger**; an online self-hosted runner with the exact labels is required.
+5. From GitHub Actions, select the workflow named
+   **Roblox MCP - Start persistent interactive Studio tunnel** and click
+   **Run workflow**. This dispatch entrypoint is deliberately installed
+   on the default `main` branch (GitHub requires that for manual workflow
+   discovery). It checks out `feature/studio-openai-tunnel-assisted` for
+   the actual tested code. There is **no automatic push trigger**; an online
+   self-hosted runner with the exact labels is required.
 
 ## Expected secure path
 
