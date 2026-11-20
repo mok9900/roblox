@@ -106,3 +106,56 @@ execution limits. No perpetual 24/7 Studio session is claimed.
   `list_roblox_studios` are **not yet end-to-end verified**.
 
 All code and test jobs continue to execute on GitHub-managed runners only.
+
+## 2026-11-21 official GitHub-hosted Gmail OAuth diagnosis
+
+After the owner updated the three GitHub Actions secrets, run
+[44839948912](https://github.com/mok9900/roblox/actions/runs/44839948912)
+confirmed their **presence**, then safely stopped before Roblox login
+because the Google OAuth refresh-token exchange returned HTTP 401. A
+follow-up with sanitized error classification,
+[44840108422](https://github.com/mok9900/roblox/actions/runs/44840108422),
+confirmed the precise Google error category:
+`GMAIL_OAUTH_OR_API_UNAUTHORIZED_CLIENT`.
+
+Per Google's OpenID Connect error definitions, `unauthorized_client`
+means the OAuth client is not authorized to use the requested grant type.
+This does **not** prove the Roblox credentials or Studio MCP are broken.
+
+**Correct OAuth association in the user's own browser (no local runner):**
+1. Google Cloud Console → Google Auth Platform → Clients → open the
+   intended **web application** client (e.g. the user's RS w GA A client).
+   Use its own Client ID and newly rotated active Client Secret. The
+   browser screenshots from the prior attempt showed Google OAuth
+   Playground's own default Client ID, not demonstrably the newly
+   created client. Do not mix these identities.
+2. In OAuth Playground **settings gear**, enable
+   **Use your own OAuth credentials**, then enter that **same new
+   client's** ID and Client Secret. Request **only**
+   `https://www.googleapis.com/auth/gmail.readonly`.
+3. Start OAuth Playground's authorization **from Step 1 again** with
+   offline access enabled. Complete consent under the Gmail account
+   that receives Roblox email codes, then exchange the **new**
+   authorization code for a **new Refresh Token** under that same client.
+   A refresh token issued to a different OAuth client cannot be
+   transferred by just updating GitHub's Client ID/Secret.
+4. Replace all **three** repository Secrets with this matching set.
+   Do not post their contents, screenshot them, commit them, or use
+   broad Gmail scopes.
+5. Trigger **Roblox Studio MCP - GitHub-hosted Windows only** again.
+   Its read-only Gmail OAuth preflight must pass *before* logging into
+   Roblox. If Google still refuses `refresh_token` grant, inspect the
+   OAuth client type, consent-screen access, and Google Cloud client
+   status. The current action must remain stopped until Google
+   authenticates this client.
+
+The upgraded `gmail_otp.py` distinguishes `INVALID_CLIENT`,
+`UNAUTHORIZED_CLIENT`, `INVALID_GRANT` and similar allowlisted
+categories without logging Google error descriptions or response
+bodies. Code compilation, Python regression tests, PowerShell static
+checks and Windows offline OCR tests all succeeded in
+[44840048758](https://github.com/mok9900/roblox/actions/runs/44840048758).
+
+Official references:
+- https://developers.google.com/identity/openid-connect/reference
+- https://developers.google.com/identity/protocols/oauth2/web-server
