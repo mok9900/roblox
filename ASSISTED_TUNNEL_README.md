@@ -1,3 +1,11 @@
+> **Current implementation (2026-11-21): GitHub-hosted Windows Actions only.**
+> The earlier self-hosted/persistent-runner proposals below are historical and
+> **must not be used** for this project. Use the new [GitHub-hosted-only
+> instructions](GITHUB_HOSTED_ONLY_README.md) and the default-branch
+> `Roblox Studio MCP - GitHub-hosted Windows only` Actions workflow instead.
+> The live MCP connection still requires successful user-authorized Gmail
+> OAuth provisioning and an actual tunnel/client handshake.
+
 # Assisted Roblox Studio + OpenAI Secure MCP Tunnel
 
 Experimental setup. main is unchanged.
