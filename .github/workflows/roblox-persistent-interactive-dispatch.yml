@@ -1,0 +1,40 @@
+name: Roblox MCP - Start persistent interactive Studio tunnel
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: roblox-studio-persistent-mcp-single-instance
+  cancel-in-progress: false
+
+jobs:
+  studio-mcp:
+    name: Use signed-in Windows Studio without repeating Roblox 2FA
+    # Only a runner you explicitly registered with this custom label can run.
+    # It must be started via run.cmd in the logged-in desktop, not as a service.
+    runs-on: [self-hosted, Windows, X64, roblox-studio-interactive]
+    timeout-minutes: 330
+    env:
+      CONTROL_PLANE_API_KEY: ${{ secrets.OPENAI_TUNNEL_RUNTIME_KEY }}
+      CONTROL_PLANE_TUNNEL_ID: ${{ secrets.OPENAI_TUNNEL_ID }}
+    steps:
+      - name: Checkout tested feature branch with guarded Studio scripts
+        uses: actions/checkout@v4
+        with:
+          ref: feature/studio-openai-tunnel-assisted
+          persist-credentials: false
+      - name: Verify the required tunnel secrets are configured
+        shell: pwsh
+        run: |
+          if (-not $env:CONTROL_PLANE_API_KEY -or -not $env:CONTROL_PLANE_TUNNEL_ID) {
+            throw 'PERSISTENT_TUNNEL_SECRETS_MISSING'
+          }
+          Write-Host 'PERSISTENT_TUNNEL_SECRET_PRESENCE_VERIFIED'
+      - name: Locate signed Studio and official checksum-verified tunnel-client
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./ci/assisted/install-windows.ps1
+      - name: Reuse existing sign-in, validate MCP and run OpenAI tunnel
+        shell: pwsh
+        run: ./ci/assisted/session-persistent.ps1
