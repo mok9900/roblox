@@ -20,7 +20,7 @@ ENABLE = re.compile(
 )
 OVERFLOW = re.compile(r"^(?:\.\.\.|…|⋯|more|more options|더보기|추가 옵션)$", re.I)
 SETTINGS = re.compile(r"^(?:settings|설정)$", re.I)
-ALLOWED = ("Button", "MenuItem", "Hyperlink", "TabItem", "CheckBox", "ListItem", "Custom")
+ALLOWED = ("button", "menuitem", "hyperlink", "tabitem", "checkbox", "listitem", "custom")
 
 
 def studio_pids():
@@ -92,7 +92,7 @@ def click_unique(pattern, timeout=10, *, types=ALLOWED):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         cs = [c for c in controls()
-              if kind(c) in types and pattern.fullmatch(safe_name(c))]
+              if kind(c) in tuple(t.lower() for t in types) and pattern.fullmatch(safe_name(c))]
         # Never pick the first of several identically named buttons.
         if len(cs) == 1:
             try:
@@ -141,7 +141,7 @@ def assistant_topbar():
     for w in studio_windows():
         try:
             for c in w.descendants():
-                if not c.is_visible() or kind(c) not in ("Button", "Hyperlink", "Custom"):
+                if not c.is_visible() or kind(c) not in ("button", "hyperlink", "custom"):
                     continue
                 if top_right(w, c):
                     candidates.append(c)
@@ -298,7 +298,7 @@ def safe_diagnostics(stage):
 def find_toggle():
     cs = controls()
     labeled = [c for c in cs if ENABLE.search(safe_name(c))]
-    toggles = [c for c in labeled if kind(c) in ("CheckBox", "Button", "Switch")]
+    toggles = [c for c in labeled if kind(c) in ("checkbox", "button", "switch")]
     if len(toggles) == 1:
         return toggles[0]
     if len(toggles) > 1 or len(labeled) != 1:
@@ -310,7 +310,7 @@ def find_toggle():
         mid_y = (rect.top+rect.bottom)/2
         near = []
         for c in cs:
-            if kind(c) not in ("CheckBox", "Switch"):
+            if kind(c) not in ("checkbox", "switch"):
                 continue
             cr = c.rectangle()
             cy = (cr.top+cr.bottom)/2
