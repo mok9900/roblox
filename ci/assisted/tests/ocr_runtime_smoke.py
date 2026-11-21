@@ -31,6 +31,19 @@ def main():
     print("MCP_OCR_SMOKE: synthetic_dark_ai_assistant_read=%s" % dark_ok)
     if not dark_ok:
         raise SystemExit("MCP_OCR_DARK_TOOLTIP_SMOKE_FAILED")
+    # The official November 2026 Studio status bar has a compact MCP
+    # badge. Test the same 3x scale used by its guarded click helper.
+    status = Image.new("RGB", (430, 92), (34, 38, 44))
+    mcp_font = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", 22)
+    ImageDraw.Draw(status).text((320, 35), "MCP", font=mcp_font,
+                                fill=(235, 235, 235))
+    enlarged = status.resize((1290, 276))
+    badge = RapidOCR()(np.asarray(enlarged))
+    badge_ok = bool(badge is not None and badge.txts and
+                    any(x.strip().casefold() == "mcp" for x in badge.txts))
+    print("MCP_OCR_SMOKE: synthetic_compact_mcp_status_read=%s" % badge_ok)
+    if not badge_ok:
+        raise SystemExit("MCP_OCR_STATUS_BADGE_SMOKE_FAILED")
 
 
 if __name__ == "__main__":
