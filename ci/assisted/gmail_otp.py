@@ -69,6 +69,41 @@ def _json_request(url, *, token=None, form=None):
                 "invalid_scope", "deleted_client", "disabled_client"
             }:
                 category = name.upper()
+            # Gmail API uses nested standard *reason* enums (not an
+            # OAuth top-level error string). Never emit descriptions, raw
+            # body, project ID, account address or arbitrary enum values.
+            if isinstance(name, dict):
+                allowed = {
+                    "accessNotConfigured": "API_NOT_ENABLED",
+                    "insufficientPermissions": "INSUFFICIENT_OAUTH_SCOPES",
+                    "domainPolicy": "GMAIL_DOMAIN_POLICY",
+                    "rateLimitExceeded": "RATE_LIMIT",
+                    "userRateLimitExceeded": "USER_RATE_LIMIT",
+                    "quotaExceeded": "QUOTA_EXCEEDED",
+                    "SERVICE_DISABLED": "API_NOT_ENABLED",
+                    "ACCESS_TOKEN_SCOPE_INSUFFICIENT": "INSUFFICIENT_OAUTH_SCOPES",
+                    "CONSUMER_INVALID": "API_CONSUMER_INVALID",
+                    "API_KEY_SERVICE_BLOCKED": "API_ACCESS_BLOCKED",
+                    "QUOTA_EXCEEDED": "QUOTA_EXCEEDED",
+                    "VPC_SERVICE_CONTROLS": "VPC_SERVICE_CONTROLS",
+                }
+                reasons = []
+                for item in (name.get("errors") or [])[:5]:
+                    if isinstance(item, dict):
+                        reasons.append(item.get("reason"))
+                for item in (name.get("details") or [])[:5]:
+                    if isinstance(item, dict):
+                        reasons.append(item.get("reason"))
+                for reason in reasons:
+                    if isinstance(reason, str) and reason in allowed:
+                        category = allowed[reason]
+                        break
+                if category.startswith("HTTP_"):
+                    status = name.get("status")
+                    if status == "PERMISSION_DENIED":
+                        category = "PERMISSION_DENIED"
+                    elif status == "RESOURCE_EXHAUSTED":
+                        category = "RESOURCE_EXHAUSTED"
         except (ValueError, UnicodeError, OSError):
             pass
         raise RuntimeError("GMAIL_OAUTH_OR_API_%s" % category) from None
