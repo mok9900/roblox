@@ -123,7 +123,7 @@ def tooltip_assistant():
             if (w.is_visible() and w.element_info.control_type == "ToolTip"
                     and w.element_info.process_id in studio_related_pids()):
                 name = (w.element_info.name or "").strip().lower()
-                if name in ("assistant", "어시스턴트"):
+                if name in ("assistant", "ai assistant", "어시스턴트"):
                     names.add(name)
         except Exception:
             continue
@@ -197,7 +197,7 @@ def visible_assistant_tooltip():
                         continue
                     name = (win.window_text() or "").strip().lower()
                     klass = (win.class_name() or "").lower()
-                    if name in ("assistant", "어시스턴트") and (
+                    if name in ("assistant", "ai assistant", "어시스턴트") and (
                         "tooltip" in klass or klass.startswith("tooltips")
                     ):
                         return True
