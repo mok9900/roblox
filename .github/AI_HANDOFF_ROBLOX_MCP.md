@@ -118,3 +118,16 @@ Implementation as of feature commit `f30ecd9f` and main commit `e0292e91`: `sess
 Earlier run `44889043027` started with the old *combined* single-step workflow; it cannot display these separate gates. Once the earlier run has completed, trigger one new GitHub-hosted run, then inspect the two new step statuses. New runs must never overlap old authenticated Studio sessions. An extra GitHub-hosted status reporter posts run outcomes to Issue #1 after completion, but never claims MCP functionality.
 
 All tests after the split passed in [44891326634](https://github.com/mok9900/roblox/actions/runs/44891326634). Keep any future modifications to `session.ps1` compatible with the standalone feature workflow unless intentionally deprecating it.
+
+## 10. 1080p run failure, reporter proven, safe OCR diagnostic iteration
+
+At 2026-11-21 18:50 KST full-HD authenticated run [44889043027](https://github.com/mok9900/roblox/actions/runs/44889043027) **finished with failure**. Final job `136801371258` proved actual Google OAuth/Gmail 2FA, Studio login and local Baseplate, plus `HOSTED_DISPLAY_AFTER width=1920 height=1080` and `MCP_EDITOR_MAXIMIZED width=1920 height=1017`. Assistant still absent, shown by `MCP_VISUAL_DIAG scanned=21 text_hints=0 tooltip_verified=False`, `ASSISTANT_UI_NOT_ACCESSIBLE`. No `mcp.bat`, tunnel doctor or CI Baseplate MCP call was proven.
+
+The new reporter **actually worked**: [reporter run 44891442721](https://github.com/mok9900/roblox/actions/runs/44891442721) completed successfully and posted safe metadata to [Issue #1 comment 7060837248](https://github.com/mok9900/roblox/issues/1#issuecomment-7060837248). So future completed hosted runs will be summarized even after the current chat ends.
+
+Feature changes for the next real run:
+- `activate-mcp-ui.py` commit `225a4535`: avoid repeatedly enumerating Studio UIA descendants for ~4-6 min each; run verified editor hover-only OCR first, followed by **one** UIA labeled-button fallback, then fail closed. All existing no-blind-click restrictions remain.
+- `assistant_visual.py` commit `84bd0389`: adds only numeric `baseline_items`, `nonempty_frames`, `max_items` alongside `scanned`, `text_hints`. No OCR text or screenshot is persisted or logged. This distinguishes an empty/unreadable DXGI crop from a visible toolbar that lacks Assistant.
+- GitHub-hosted unit/PowerShell/display/OCR tests: [44891571458](https://github.com/mok9900/roblox/actions/runs/44891571458), check actual completion before running new authenticated tests.
+
+The default branch main workflow already splits **MCP setup/doctor** from **foreground tunnel run**. When the next integration runs, the GitHub Actions steps should show the exact boundary rather than staying indefinitely inside the old combined step. The official Roblox Assistant panel remains the unresolved blocker.
