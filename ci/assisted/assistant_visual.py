@@ -11,7 +11,7 @@ import re
 import time
 
 
-EXACT_ASSISTANT = re.compile(r"^(?:assistant|어시스턴트)$", re.I)
+EXACT_ASSISTANT = re.compile(r"^(?:(?:ai\s+)?assistant|어시스턴트)$", re.I)
 
 
 def focus_verified_editor(win, user32, *, pause=time.sleep):
