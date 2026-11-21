@@ -89,6 +89,13 @@ if ($LASTEXITCODE -ne 0) { throw 'OpenAI tunnel profile initialization failed.' 
 Write-Host 'Tunnel profile initialized. Running official doctor checks.'
 & $env:TUNNEL_EXE doctor --profile $profileName --explain
 if ($LASTEXITCODE -ne 0) { throw 'OpenAI tunnel doctor check failed.' }
+# Expose the completed MCP+doctor setup as its own GitHub Actions step
+# before starting an intentionally long-running foreground tunnel. This
+# lets the next AI see precise stage completion while a tunnel is active.
+if ($env:ROBLOX_MCP_SETUP_ONLY -eq '1') {
+    Write-Host 'STUDIO_MCP_SETUP_AND_TUNNEL_DOCTOR_VERIFIED: stopping at completed setup gate.'
+    exit 0
+}
 Write-Host 'TUNNEL_STARTING: OpenAI Secure MCP Tunnel is connecting.'
 & $env:TUNNEL_EXE run --profile $profileName
 if ($LASTEXITCODE -ne 0) { throw 'OpenAI tunnel-client exited unsuccessfully.' }
