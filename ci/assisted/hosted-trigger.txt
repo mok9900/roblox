@@ -4,3 +4,5 @@
 2026-11-21 GitHub-hosted OAuth diagnostic retry after safe Google error classification update. No unverified Roblox credential submission: OAuth preflight must pass first.
 
 2026-11-21 17:21 KST: account owner confirms corrected Google OAuth client credentials and refresh token. Retry GitHub-hosted Windows official Gmail OAuth preflight; proceed with real Studio sign-in and MCP only if all preflight gates pass. No self-hosted runner and no secrets in logs.
+
+2026-11-21 KST: user requests another real hosted-only run after verifying OAuth Playground custom client settings. Fail closed at Gmail preflight if OAuth credentials remain invalid; otherwise continue official Roblox 2FA and MCP. No secrets logged.
