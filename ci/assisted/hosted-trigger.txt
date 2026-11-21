@@ -14,3 +14,5 @@
 2026-11-21: owner enabled Gmail API in Google Cloud project. Retry exclusively GitHub-hosted windows-2022 OAuth preflight; only after success allow verified Roblox 2FA, local Baseplate, official Assistant MCP and tunnel. No secrets or OTPs in logs.
 
 2026-11-21: authenticated hosted run previously proved Gmail OAuth + native Roblox email 2FA + local Baseplate, but Assistant DXGI had editor_not_foreground. Re-run official GitHub-hosted Windows using verified-HWND temporary-topmost activation fix (unit tests #44886811772 all green), no self-hosted runner, no secrets logged.
+
+2026-11-21: retry official GitHub-hosted Windows Studio MCP with safe AI Assistant tooltip merged-heading OCR, far-right mezzanine hover scan, and validated Win32 focus. Unit/OCR/PowerShell checks all passed run 44888430660. Reuse verified official Gmail email 2FA; keep every token and code redacted. No self-hosted runner.
