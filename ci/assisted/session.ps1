@@ -58,6 +58,13 @@ if ($LASTEXITCODE -ne 0) { throw 'Roblox 2FA or Studio login verification not co
 Write-Host 'Opening an isolated local Roblox-owned Baseplate fixture with official Studio EditFile CLI.'
 ./ci/assisted/open-test-place-cli.ps1
 if ($LASTEXITCODE -ne 0) { throw 'Could not open local Baseplate test file after Roblox authentication.' }
+# Roblox deploys Assistant as a built-in OTA plugin. A new disposable
+# Windows runner can open the editor while this bundle is missing or still
+# downloading. Log only generic file counts, never folder contents.
+$assistantPluginRoot = Join-Path $env:LOCALAPPDATA 'Roblox\OTAPlugins\Deployed\BuiltInStandalonePlugins'
+$assistantBundle = Join-Path $assistantPluginRoot 'Assistant.rbxm'
+$assistantExists = Test-Path -LiteralPath $assistantBundle -PathType Leaf
+Write-Host "MCP_ASSISTANT_PLUGIN_SAFE_DIAG: official_assistant_bundle_present=$assistantExists"
 $mcpBatch = Join-Path $env:LOCALAPPDATA 'Roblox\mcp.bat'
 $mcpExe = Join-Path (Split-Path -Parent $env:STUDIO_EXE) 'StudioMCP.exe'
 Write-Host "MCP_RUNTIME_SAFE_DIAG: official_launcher_present=$(Test-Path -LiteralPath $mcpBatch), installed_binary_present=$(Test-Path -LiteralPath $mcpExe)"
