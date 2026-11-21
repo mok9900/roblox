@@ -185,6 +185,10 @@ def try_visual_assistant(win):
 
             scanned = 0
             text_hints = 0
+            nonempty_frames = 0
+            max_ocr_items = len(baseline[0])
+            # Numeric counts only: NEVER print raw OCR strings, the Studio
+            # account name, screenshot data, or user-defined place contents.
             # The Assistant sparkles icon is in Studio's TOP-RIGHT
             # mezzanine, beside sharing and notifications. Hover-only.
             # Include the final 2-4% used by compact-width Studio builds.
@@ -203,6 +207,9 @@ def try_visual_assistant(win):
                     scanned += 1
                     if first is None:
                         continue
+                    if first[0]:
+                        nonempty_frames += 1
+                    max_ocr_items = max(max_ocr_items, len(first[0]))
                     if any(tooltip_heading(item[0]) for item in first[0]):
                         text_hints += 1
                     if not unique_tooltip_near_pointer(
@@ -220,7 +227,8 @@ def try_visual_assistant(win):
                     click_abs(*point)
                     print("MCP_ASSISTANT_OPEN_REQUESTED: DXGI exact tooltip double-check + guarded SendInput", flush=True)
                     return True
-            print("MCP_VISUAL_DIAG: scanned=%d text_hints=%d tooltip_verified=False" % (scanned, text_hints), flush=True)
+            print("MCP_VISUAL_DIAG: scanned=%d text_hints=%d baseline_items=%d nonempty_frames=%d max_items=%d tooltip_verified=False" %
+                  (scanned, text_hints, len(baseline[0]), nonempty_frames, max_ocr_items), flush=True)
         finally:
             if cam is not None:
                 cam.release()
