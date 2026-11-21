@@ -134,7 +134,13 @@ def unique_mcp_status_position(items, *, region):
     left, top, right, bottom = region
     matches = []
     for text, conf, x0, y0, x1, y1 in items:
-        if " ".join(str(text).split()).casefold() != "mcp" or conf < .90:
+        label = " ".join(str(text).split()).casefold()
+        # Official screenshots show the status indicator may contain
+        # an adjacent client count, e.g. "MCP 1". It is still uniquely
+        # identifiable only in the verified bottom-right status strip.
+        if not (label == "mcp" or re.fullmatch(r"mcp [0-9]{1,2}", label)):
+            continue
+        if conf < .90:
             continue
         if not (left <= x0 < x1 <= right and top <= y0 < y1 <= bottom):
             continue
