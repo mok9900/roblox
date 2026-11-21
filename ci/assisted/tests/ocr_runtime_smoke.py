@@ -22,7 +22,7 @@ def main():
     # Real Roblox Studio Assistant tooltips use light text on dark chrome.
     # Verify this contrast too, without any live Studio account or pixels.
     dark = Image.new("RGB", (720, 180), (35, 37, 41))
-    dark_font = ImageFont.truetype(r"C:\\Windows\\Fonts\\arial.ttf", 61)
+    dark_font = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", 61)
     ImageDraw.Draw(dark).text((34, 38), "AI Assistant",
                               font=dark_font, fill="white")
     test = RapidOCR()(np.asarray(dark))
