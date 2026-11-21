@@ -11,7 +11,7 @@ import time
 import psutil
 from pywinauto import Desktop, mouse
 
-ASSISTANT = re.compile(r"\bassistant\b|어시스턴트", re.I)
+ASSISTANT = re.compile(r"(?:ai\s+)?assistant|어시스턴트", re.I)
 MCP_MENU = re.compile(r"^(?:manage mcp servers|mcp 서버 관리|mcp 서버 관리하기)$", re.I)
 MCP_SETTINGS = re.compile(r"^(?:mcp servers|mcp 서버)$", re.I)
 ENABLE = re.compile(
@@ -286,7 +286,7 @@ def launcher_ready():
 def safe_diagnostics(stage):
     cs = controls()
     keys = [
-        (r"assistant|어시스턴트", "assistant"),
+        (r"(?:ai\s+)?assistant|어시스턴트", "assistant"),
         (r"(?:manage )?mcp servers?|mcp 서버(?: 관리)?", "mcp_menu"),
         (r"settings|설정", "settings"),
         (r"more|more options|더보기|\.\.\.|…|⋯", "more"),
