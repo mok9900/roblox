@@ -51,7 +51,7 @@ def focus_verified_editor(win, user32, *, pause=time.sleep):
         ]
         user32.SetWindowPos.restype = ct.c_int
         flags = 0x0001 | 0x0002 | 0x0040  # no resize/move, show
-        user32.ShowWindow(hwnd, 9)         # SW_RESTORE
+        user32.ShowWindow(hwnd, 3)         # SW_MAXIMIZE: reveal full-right mezzanine
         try:
             for _ in range(3):
                 if user32.GetForegroundWindow() == hwnd:
@@ -141,11 +141,13 @@ def try_visual_assistant(win):
         return False
 
     try:
-        rect = win.rectangle()
-        if rect.width() < 700 or rect.height() < 500:
-            return False
         if not focus_verified_editor(win, user32):
             print("MCP_VISUAL_DIAG: editor_not_foreground_after_guarded_activation", flush=True)
+            return False
+        # Foreground activation may also maximize this verified local editor.
+        # Always capture its NEW bounds, never its pre-maximize dimensions.
+        rect = win.rectangle()
+        if rect.width() < 700 or rect.height() < 500:
             return False
 
         engine = RapidOCR()
