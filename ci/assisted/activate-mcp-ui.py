@@ -376,13 +376,30 @@ if launcher_ready():
     print("MCP_OFFICIAL_LAUNCHER_ALREADY_PRESENT", flush=True)
     raise SystemExit(0)
 
+# Official November 2026 Roblox Studio now exposes an MCP status button
+# at the bottom-right of an open Place. That status button opens settings
+# directly (MCP Servers tab), so it avoids the custom-drawn top Assistant
+# icon which remained inaccessible on repeated GitHub-hosted runs.
+# Click only after TWO fresh, exact high-confidence OCR label observations.
+from assistant_visual import try_mcp_status_settings
+status_settings_open = try_mcp_status_settings(editors[0])
+if status_settings_open:
+    print("MCP_DISCOVERY_MODE: verified_bottom_right_status_settings", flush=True)
+    time.sleep(2)
+    # A recent Studio build may open directly in MCP Servers or in another
+    # settings tab; click only the uniquely named official tab if present.
+    switched = click_unique(MCP_SETTINGS, 0.2,
+                            types=("TabItem", "Button", "ListItem", "MenuItem"))
+    print("MCP_SETTINGS_TAB_REQUESTED: uniquely_labeled=%s" % switched, flush=True)
+else:
+    print("MCP_DISCOVERY_MODE: verified_status_absent_try_guarded_visual", flush=True)
 # On official GitHub-hosted Studio, UIA enumeration repeatedly takes
 # several minutes and returned zero Assistant nodes in 1024px and 1920px
-# runs. Try local editor-only, double-observed DXGI/Win32 tooltip discovery
-# FIRST. Keep exactly one expensive UIA fallback pass for other builds.
-# No click is allowed from approximate coordinates alone.
-print("MCP_DISCOVERY_MODE: guarded_visual_then_single_uia_fallback", flush=True)
-opened = hover_discover_assistant()
+# runs. Keep only one guarded visual scan, then single UIA fallback.
+# No click is ever allowed from approximate coordinates alone.
+opened = status_settings_open
+if not opened:
+    opened = hover_discover_assistant()
 if not opened:
     opened = click_unique(ASSISTANT, 0.2, types=("Button", "Hyperlink", "Custom"))
 if not opened:
@@ -392,21 +409,22 @@ if not opened:
     raise SystemExit("ASSISTANT_UI_NOT_ACCESSIBLE")
 
 time.sleep(2)
-safe_diagnostics("assistant_opened")
-# Prefer official direct menu, then Assistant overflow -> Manage MCP Servers.
-if not click_unique(MCP_MENU, 6):
-    if not click_unique(OVERFLOW, 8, types=("Button", "MenuItem", "Custom")):
-        safe_diagnostics("overflow_missing")
-        raise SystemExit("ASSISTANT_OVERFLOW_NOT_ACCESSIBLE")
-    if not click_unique(MCP_MENU, 10):
-        if not click_unique(SETTINGS, 8):
-            safe_diagnostics("settings_missing")
-            raise SystemExit("ASSISTANT_SETTINGS_NOT_ACCESSIBLE")
-        if not click_unique(MCP_SETTINGS, 10):
-            safe_diagnostics("mcp_settings_missing")
-            raise SystemExit("MCP_SERVER_SETTINGS_NOT_ACCESSIBLE")
+if not status_settings_open:
+    safe_diagnostics("assistant_opened")
+    # Prefer official direct menu, then Assistant overflow -> Manage MCP.
+    if not click_unique(MCP_MENU, 6):
+        if not click_unique(OVERFLOW, 8, types=("Button", "MenuItem", "Custom")):
+            safe_diagnostics("overflow_missing")
+            raise SystemExit("ASSISTANT_OVERFLOW_NOT_ACCESSIBLE")
+        if not click_unique(MCP_MENU, 10):
+            if not click_unique(SETTINGS, 8):
+                safe_diagnostics("settings_missing")
+                raise SystemExit("ASSISTANT_SETTINGS_NOT_ACCESSIBLE")
+            if not click_unique(MCP_SETTINGS, 10):
+                safe_diagnostics("mcp_settings_missing")
+                raise SystemExit("MCP_SERVER_SETTINGS_NOT_ACCESSIBLE")
 
-print("MCP_SERVER_SETTINGS_OPENED", flush=True)
+print("MCP_SERVER_SETTINGS_OPENED: via_status=%s" % status_settings_open, flush=True)
 enable_toggle()
 if not launcher_ready():
     raise SystemExit("STUDIO_MCP_LAUNCHER_NOT_GENERATED")
