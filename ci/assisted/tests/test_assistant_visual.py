@@ -101,6 +101,14 @@ class StudioMCPStatusBadgeTests(unittest.TestCase):
         self.assertIsNotNone(mod.unique_mcp_status_position(
             [self.label(name="  mCp  ")], region=self.REGION))
 
+    def test_documented_status_with_client_count(self):
+        for name in ("MCP 0", "MCP 1", "MCP 12"):
+            self.assertIsNotNone(mod.unique_mcp_status_position(
+                [self.label(name=name)], region=self.REGION))
+        for name in ("MCP 100", "MCP Connected 1", "MCP - 1"):
+            self.assertIsNone(mod.unique_mcp_status_position(
+                [self.label(name=name)], region=self.REGION))
+
     def test_never_click_weak_or_unrelated_text(self):
         for name in ("MCP Servers", "MCP Permissions", "MCP Connected",
                      "Manage MCP", "MCF", "Assistant", "MCP (0)"):
