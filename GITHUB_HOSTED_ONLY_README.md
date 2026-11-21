@@ -192,3 +192,25 @@ Only authorize Gmail readonly; do not share any credential or code.
 Once the secret pair is valid, the hosted workflow's Gmail OAuth preflight
 will resume before official Roblox GUI login. No attempt to bypass 2FA
 or run on local/self-hosted infrastructure is made.
+
+## 2026-11-21: hosted retry after matching OAuth client settings
+
+The owner requested another real GitHub-hosted run:
+[44885329003](https://github.com/mok9900/roblox/actions/runs/44885329003).
+GitHub-hosted Windows executed successfully and all required Actions secret
+presence checks passed. Google OAuth token grant **failed with
+`GMAIL_OAUTH_OR_API_INVALID_GRANT`**, a new and different response from the
+earlier `INVALID_CLIENT`. No Studio login, Roblox 2FA or MCP handoff was
+attempted.
+
+**Owner action:** replace only `GMAIL_OAUTH_REFRESH_TOKEN` with a newly
+exchanged refresh token minted under the **exact OAuth client whose ID and
+current active secret are already in GitHub**. In OAuth Playground, enable
+"Use your own OAuth credentials", use this identical Client ID and Secret,
+start authorization from Step 1 with `gmail.readonly`, choose offline
+access, exchange the new code for tokens, then copy the *refresh* token
+(not the access token or authorization code). Do not print or share it.
+If consent testing restrictions or a revocation affect the token, reauthorize
+the user in that OAuth client. The existing workflow can be rerun after
+the secret is replaced. No additional unauthenticated retries should run
+until the credential change is made.
