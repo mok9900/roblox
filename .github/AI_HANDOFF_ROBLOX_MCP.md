@@ -107,3 +107,14 @@ The default branch also contains `.github/workflows/roblox-mcp-ai-handoff.yml`, 
 It does **not** read/private-post GitHub Actions logs, Roblox credentials, Gmail data or OTPs, and it does not start an AI model, schedule follow-up runs, or assert MCP readiness. The next AI must still inspect actual run logs and update the issue manually with evidence. Verify reporter operation by checking Issue #1 after the next **completed** hosted Studio run.
 
 Never treat the reporter as a self-hosted runner. It uses `ubuntu-latest`, a GitHub-hosted runner, only for posting safe status metadata.
+
+## 9. Two distinct Actions stages for easier live AI diagnosis (new code)
+
+Implementation as of feature commit `f30ecd9f` and main commit `e0292e91`: `session.ps1` now supports `ROBLOX_MCP_SETUP_ONLY='1'`. This returns exit 0 **only after** the original `tunnel-client doctor --profile roblox-studio-ci --explain` has passed. Default-branch workflow now has two **separate** steps:
+
+1. `Verify Roblox email 2FA, local Baseplate, official Assistant MCP and tunnel doctor` (hosted Windows, `timeout-minutes: 32`, `ROBLOX_MCP_SETUP_ONLY: '1'`). A green check proves the preceding official Studio MCP/doctor gate; a failure here reveals the correct place to inspect logs.
+2. `Run verified OpenAI Secure MCP Tunnel (GitHub-hosted foreground)`. Invokes `tunnel-client run --profile roblox-studio-ci` only after the first step succeeds. It is normal for this step to remain **in progress** while the tunnel stays alive; verify actual MCP tool calls separately, not just process longevity.
+
+Earlier run `44889043027` started with the old *combined* single-step workflow; it cannot display these separate gates. Once the earlier run has completed, trigger one new GitHub-hosted run, then inspect the two new step statuses. New runs must never overlap old authenticated Studio sessions. An extra GitHub-hosted status reporter posts run outcomes to Issue #1 after completion, but never claims MCP functionality.
+
+All tests after the split passed in [44891326634](https://github.com/mok9900/roblox/actions/runs/44891326634). Keep any future modifications to `session.ps1` compatible with the standalone feature workflow unless intentionally deprecating it.
