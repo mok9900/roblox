@@ -159,3 +159,36 @@ checks and Windows offline OCR tests all succeeded in
 Official references:
 - https://developers.google.com/identity/openid-connect/reference
 - https://developers.google.com/identity/protocols/oauth2/web-server
+
+## 2026-11-21 17:21 KST: GitHub-hosted real OAuth retry
+
+The owner confirmed rotating/replacing Google OAuth credentials. Triggered
+GitHub-hosted Windows run
+[44884508623](https://github.com/mok9900/roblox/actions/runs/44884508623)
+from main using the supported `hosted-trigger.txt` push.
+
+- The GitHub-hosted runner started and all required GitHub Actions secret
+  presence checks passed (Roblox, tunnel, three Gmail OAuth secrets).
+- The live Google refresh-token grant returned
+  **`GMAIL_OAUTH_OR_API_INVALID_CLIENT`**. This is distinct from the prior
+  `UNAUTHORIZED_CLIENT` and was safely classified without printing the
+  client ID, client secret, refresh token or Google response body.
+- Roblox sign-in, a new verification email, Assistant MCP and the tunnel
+  did **not** start; the preflight correctly failed closed.
+
+**Owner's next configuration check (browser only, no local runner):**
+open Google Cloud Console → Google Auth Platform → Clients →
+the newly created `RS w GA A` web client. Verify the ID stored under
+`GMAIL_OAUTH_CLIENT_ID` is this client's actual
+`...apps.googleusercontent.com` ID, **not** the old OAuth Playground
+default client. Verify the active **rotated secret for this exact same
+client** is stored under `GMAIL_OAUTH_CLIENT_SECRET` (client secrets
+typically start `GOCSPX-`). Do not put a `GOCSPX-` secret into the ID
+field. Generate a fresh authorization/refresh token from OAuth Playground
+with **Use your own OAuth credentials** enabled and the identical
+client ID+secret, and replace `GMAIL_OAUTH_REFRESH_TOKEN` accordingly.
+Only authorize Gmail readonly; do not share any credential or code.
+
+Once the secret pair is valid, the hosted workflow's Gmail OAuth preflight
+will resume before official Roblox GUI login. No attempt to bypass 2FA
+or run on local/self-hosted infrastructure is made.
