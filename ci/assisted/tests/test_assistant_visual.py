@@ -85,6 +85,53 @@ class AssistantTooltipPolicyTest(unittest.TestCase):
         self.assertFalse(near([], POINT, region=REGION))
 
 
+class StudioMCPStatusBadgeTests(unittest.TestCase):
+    """The official November 2026 status-bar entry is not a guessed click."""
+    REGION = (1100, 925, 1914, 1040)
+
+    def label(self, *, name="MCP", score=.98, x0=1780, y0=994,
+              x1=1824, y1=1018):
+        return (name, score, x0, y0, x1, y1)
+
+    def test_exact_studio_mcp_status_is_actionable(self):
+        self.assertEqual(mod.unique_mcp_status_position(
+            [self.label()], region=self.REGION), (1802, 1006))
+
+    def test_casefold_whitespace_is_accepted(self):
+        self.assertIsNotNone(mod.unique_mcp_status_position(
+            [self.label(name="  mCp  ")], region=self.REGION))
+
+    def test_never_click_weak_or_unrelated_text(self):
+        for name in ("MCP Servers", "MCP Permissions", "MCP Connected",
+                     "Manage MCP", "MCF", "Assistant", "MCP (0)"):
+            with self.subTest(name=name):
+                self.assertIsNone(mod.unique_mcp_status_position(
+                    [self.label(name=name)], region=self.REGION))
+        self.assertIsNone(mod.unique_mcp_status_position(
+            [self.label(score=.89)], region=self.REGION))
+
+    def test_only_bottom_right_status_region_is_actionable(self):
+        for x0, y0, x1, y1 in [
+            (1050, 994, 1100, 1018),  # outside right-side section
+            (1780, 500, 1824, 521),   # editor content, not status
+            (1780, 1030, 1824, 1070), # outside visible editor bounds
+            (1600, 980, 1800, 1002),  # abnormally wide OCR rectangle
+        ]:
+            with self.subTest(rect=(x0, y0, x1, y1)):
+                self.assertIsNone(mod.unique_mcp_status_position(
+                    [self.label(x0=x0, y0=y0, x1=x1, y1=y1)],
+                    region=self.REGION))
+
+    def test_ambiguous_duplicate_mcp_labels_cannot_be_clicked(self):
+        items = [self.label(), self.label(x0=1680, x1=1724)]
+        self.assertIsNone(mod.unique_mcp_status_position(
+            items, region=self.REGION))
+
+    def test_empty_capture_is_not_a_click(self):
+        self.assertIsNone(mod.unique_mcp_status_position(
+            [], region=self.REGION))
+
+
 class StudioForegroundGuardTests(unittest.TestCase):
     class PositionSetter:
         def __init__(self):
