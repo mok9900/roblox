@@ -99,6 +99,32 @@ Write-Host "MCP_RUNTIME_SAFE_DIAG: official_launcher_present=$(Test-Path -Litera
 # If present, the following official tunnel doctor must still prove a live
 # MCP handshake before declaring success.
 if (-not (Test-Path -LiteralPath $mcpBatch)) {
+    # Authenticated account's own Studio Assistant settings can persist MCP
+    # enabled=true even when the newest built-in Assistant's UI is not
+    # accessible in Windows UIA/DXGI. In a disposable hosted runner only,
+    # prefer the exact account preference backed by Roblox's own setting
+    # format. Roblox itself must then load it and produce mcp.bat.
+    # This does not bypass login/MFA, replace StudioMCP.exe or fabricate the
+    # launcher. Failures fall through to the official guarded UI path.
+    $prefOutput = (& python .\ci\assisted\enable-official-mcp-preference.py | Out-String).Trim()
+    $prefResult = $LASTEXITCODE
+    if ($prefOutput) { Write-Host $prefOutput }
+    if ($prefResult -eq 0) {
+        Write-Host 'MCP_FIRST_PARTY_PREF_RESTART: reloading authenticated disposable Studio.'
+        Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 5
+        Start-Process -FilePath $env:STUDIO_EXE | Out-Null
+        Start-Sleep -Seconds 15
+        ./ci/assisted/open-test-place-cli.ps1
+        if ($LASTEXITCODE -ne 0) { throw 'MCP_PREF_RESTART_BASEPLATE_NOT_VERIFIED' }
+        Start-Sleep -Seconds 5
+        Write-Host "MCP_FIRST_PARTY_PREF_RESTART_RESULT: official_launcher_present=$(Test-Path -LiteralPath $mcpBatch)"
+    } else {
+        Write-Host 'MCP_PREF_APPLY_UNAVAILABLE: retain official Assistant GUI-only fallback.'
+    }
+}
+if (-not (Test-Path -LiteralPath $mcpBatch)) {
     Write-Host 'MCP_LAUNCHER_MISSING: enabling official Studio MCP from Assistant UI.'
     # OCR is local-only and used only on the signed-in, confirmed CI Baseplate
     # editor mezzanine. No image, extracted text, account data or OTP is logged.
