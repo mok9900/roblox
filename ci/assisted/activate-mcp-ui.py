@@ -372,24 +372,21 @@ if not focus_verified_editor(editors[0], user32):
 editor_rect = editors[0].rectangle()
 print("MCP_EDITOR_MAXIMIZED: width=%d height=%d" %
       (editor_rect.width(), editor_rect.height()), flush=True)
-safe_diagnostics("initial")
 if launcher_ready():
     print("MCP_OFFICIAL_LAUNCHER_ALREADY_PRESENT", flush=True)
     raise SystemExit(0)
 
-opened = False
-deadline = time.monotonic() + 65
-while time.monotonic() < deadline and not opened:
-    opened = click_unique(ASSISTANT, 3, types=("Button","Hyperlink","Custom"))
-    if not opened:
-        opened = assistant_topbar()
-    if not opened:
-        time.sleep(2)
+# On official GitHub-hosted Studio, UIA enumeration repeatedly takes
+# several minutes and returned zero Assistant nodes in 1024px and 1920px
+# runs. Try local editor-only, double-observed DXGI/Win32 tooltip discovery
+# FIRST. Keep exactly one expensive UIA fallback pass for other builds.
+# No click is allowed from approximate coordinates alone.
+print("MCP_DISCOVERY_MODE: guarded_visual_then_single_uia_fallback", flush=True)
+opened = hover_discover_assistant()
 if not opened:
-    # Use hover-only discovery on the known opened CI Baseplate editor.
-    # Click is permitted only after Windows exposes the exact official
-    # "Assistant" tooltip, never from icon color/coordinates alone.
-    opened = hover_discover_assistant()
+    opened = click_unique(ASSISTANT, 0.2, types=("Button", "Hyperlink", "Custom"))
+if not opened:
+    opened = assistant_topbar()
 if not opened:
     safe_diagnostics("assistant_not_found")
     raise SystemExit("ASSISTANT_UI_NOT_ACCESSIBLE")
