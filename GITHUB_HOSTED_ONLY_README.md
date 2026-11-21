@@ -249,3 +249,39 @@ Actual log evidence: EMAIL_2FA_STUDIO_LOGIN_SUCCEEDED and PLACE_EDITOR_VERIFIED.
 The run failed when launching Assistant: MCP_VISUAL_DIAG: editor_not_foreground and ASSISTANT_UI_NOT_ACCESSIBLE. The official mcp.bat and OpenAI Tunnel handshake were not verified.
 
 The follow-up fix adds a guarded HWND foreground restore plus temporary-topmost activation (with mandatory topmost cleanup), reusing an earlier hosted Windows technique. Only the unique verified local Baseplate editor is activated; no unknown UI targets are clicked. Regression tests cover foreground acceptance/refusal and rejection of unrelated editor windows. A new hosted authenticated run is required for actual Assistant verification.
+
+## 2026-11-21: GitHub-hosted 1080p Studio GUI test
+
+Credential-free official Windows Runner tests from
+[44837664953](https://github.com/mok9900/roblox/actions/runs/44837664953)
+confirmed both Windows 2022 and Windows 2025 default to a 1024x768
+interactive desktop. On Next Gen Roblox Studio this compact layout may hide
+or truncate the far-right Assistant sparkles button.
+
+Added `ci/assisted/configure-hosted-display.ps1` to request the Windows
+native supported 1920x1080 display mode using `Set-DisplayResolution`
+and verify actual `GetSystemMetrics` after adjustment; if unsupported,
+the script leaves the original resolution and the safe OCR fallback in
+place. The live credential-free Windows test
+[44888774981](https://github.com/mok9900/roblox/actions/runs/44888774981)
+proved that the GitHub-managed Windows 2022 runner changed **1024x768 →
+1920x1080** without any local/self-hosted machine or driver installation.
+
+The main-branch `roblox-studio-hosted-mcp.yml` now executes the display
+expansion before Studio installation and authentication. The unique local
+`ci_only_baseplate_test` editor is then maximized with a guarded Win32
+window-handle foreground check before searching the Assistant toolbar.
+The client never clicks unrelated windows or unlabeled guessed targets.
+
+Roblox's documented hover tooltip can show `AI Assistant` followed by
+a longer description. The in-memory visual OCR also accepts the documented
+title+description form if detected twice at the hovered toolbar location;
+unknown labels and settings prose are rejected. Native `mcp.bat` and a
+working OpenAI Tunnel still require a real authenticated full-width run.
+The queued run [44889043027](https://github.com/mok9900/roblox/actions/runs/44889043027)
+is the next integration verification; the prior 1024x768 run is isolated
+by GitHub Actions concurrency, and neither is a proven MCP handshake yet.
+
+All 4 credential-free test jobs (Python, PowerShell, Windows OCR and
+Windows display smoke) passed in
+[44888964857](https://github.com/mok9900/roblox/actions/runs/44888964857).
