@@ -27,6 +27,27 @@ class AssistantTooltipPolicyTest(unittest.TestCase):
         self.assertFalse(near([("AI Assistant Settings", .99, 890, 95, 1050, 120)],
                               POINT, region=REGION))
 
+    def test_official_merged_title_and_description(self):
+        long_title = ("AI Assistant Chat with Studio Assistant to get help "
+                      "and accelerate creation")
+        self.assertTrue(mod.tooltip_heading(long_title))
+        self.assertTrue(near([(long_title, .94, 725, 100, 1090, 185)],
+                             POINT, region=REGION))
+
+    def test_settings_or_generic_description_never_verified(self):
+        for name in ("AI Assistant Settings", "Assistant MCP Servers",
+                     "Chat with Studio Assistant", "Assistant content"):
+            self.assertFalse(mod.tooltip_heading(name), name)
+
+    def test_fuzzy_lowercase_official_hover_heading(self):
+        self.assertTrue(mod.tooltip_heading("AI Assistant"))
+        self.assertTrue(mod.tooltip_heading("   AI   Assistant   "))
+
+    def test_unrelated_large_merged_region_rejected(self):
+        name = "AI Assistant Chat with Studio Assistant to get help"
+        self.assertFalse(near([(name, .99, 560, 40, 1180, 225)],
+                              POINT, region=REGION))
+
     def test_verified_exact_korean_tooltip(self):
         self.assertTrue(near([("어시스턴트", .95, 890, 92, 993, 119)],
                              POINT, region=REGION))
