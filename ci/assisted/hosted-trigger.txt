@@ -10,3 +10,5 @@
 2026-11-21 owner confirms newly refreshed Gmail OAuth refresh token. Re-run GitHub-hosted Windows workflow; OAuth preflight must pass before Roblox 2FA / Studio / MCP / tunnel. No local runner, no credential disclosures.
 
 2026-11-21 hosted rerun with safe Gmail API nested 403 diagnostics enabled. Access token refresh succeeds; classify Gmail API service disabled, missing scopes, or policy and stop before Roblox login unless actual Gmail access succeeds.
+
+2026-11-21: owner enabled Gmail API in Google Cloud project. Retry exclusively GitHub-hosted windows-2022 OAuth preflight; only after success allow verified Roblox 2FA, local Baseplate, official Assistant MCP and tunnel. No secrets or OTPs in logs.
