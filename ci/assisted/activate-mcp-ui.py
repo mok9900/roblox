@@ -239,7 +239,13 @@ def hover_discover_assistant():
         wr = win.rectangle()
         if wr.width() < 700 or wr.height() < 500:
             return False
-        win.set_focus()
+        # Use the same verified foreground activation as the visual
+        # path. UIA set_focus alone failed on the latest hosted runner.
+        from assistant_visual import focus_verified_editor
+        from wgc_sendinput_probe import user32
+        if not focus_verified_editor(win, user32):
+            print("MCP_HOVER_SAFE_DIAG: verified_editor_not_foreground", flush=True)
+            return False
         # Clear any previously visible tooltip before probing.
         mouse.move(coords=(wr.left + wr.width()//2, wr.top + 240))
         time.sleep(1.1)
