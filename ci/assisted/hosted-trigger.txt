@@ -18,3 +18,5 @@
 2026-11-21: retry official GitHub-hosted Windows Studio MCP with safe AI Assistant tooltip merged-heading OCR, far-right mezzanine hover scan, and validated Win32 focus. Unit/OCR/PowerShell checks all passed run 44888430660. Reuse verified official Gmail email 2FA; keep every token and code redacted. No self-hosted runner.
 
 2026-11-21: launch official GitHub-hosted Windows 1920x1080 Studio session after smoke #44888774981 confirmed screen expansion and #44888964857 verified editor maximize/OCR tests. Retry Assistant > MCP Servers > official launcher > secure tunnel. Enforce same single-instance Actions concurrency and do not use local/self-hosted runners or print tokens.
+
+2026-11-21 AI-to-AI continuation: full-HD previous run 44889043027 failed Assistant discovery. Start next official GitHub-hosted Windows run with verified visual-first single-UIA fallback, privacy-safe OCR frame counts, and newly separate official Studio MCP+doctor vs foreground tunnel steps. GitHub Issue #1 is durable handoff; automatic post-run metadata reporter enabled. No self-hosted/local runners, no secrets in logs.
