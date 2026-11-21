@@ -45,7 +45,7 @@ class PreferenceTests(unittest.TestCase):
             mod.official_user_id("Sample_User", urlopen=fake)
 
     def test_reject_email_or_similar_arbitrary_login_without_network(self):
-        for username in ("somebody@example.com", "", "two", "not valid", "x"*80):
+        for username in ("somebody@example.com", "", "xx", "not valid", "x"*80):
             with self.subTest(username=username), self.assertRaises(ValueError):
                 mod.official_user_id(username, urlopen=lambda *a, **k: self.fail("network"))
 
