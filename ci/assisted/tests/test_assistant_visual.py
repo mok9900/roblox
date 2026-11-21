@@ -100,6 +100,7 @@ class StudioForegroundGuardTests(unittest.TestCase):
             self.allow_foreground = allow_foreground
             self.SetWindowPos = StudioForegroundGuardTests.PositionSetter()
             self.show_calls = 0
+            self.show_commands = []
             self.set_calls = 0
 
         def IsWindow(self, hwnd):
@@ -107,6 +108,7 @@ class StudioForegroundGuardTests(unittest.TestCase):
 
         def ShowWindow(self, hwnd, command):
             self.show_calls += 1
+            self.show_commands.append((hwnd, command))
 
         def GetForegroundWindow(self):
             return self.foreground
@@ -137,6 +139,7 @@ class StudioForegroundGuardTests(unittest.TestCase):
         self.assertTrue(ok)
         self.assertGreaterEqual(api.set_calls, 1)
         self.assertEqual(api.GetForegroundWindow(), editor.handle)
+        self.assertEqual(api.show_commands[0], (editor.handle, 3))
         self.assertEqual(api.SetWindowPos.calls[-1][1], ctypes.c_void_p(-2).value)
 
     def test_unverified_title_is_never_focused(self):
