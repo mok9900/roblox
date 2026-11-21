@@ -143,3 +143,11 @@ Feature helper: `ci/assisted/enable-official-mcp-preference.py`. It runs ONLY on
 Synthetic Python tests, PowerShell syntax, Windows OCR and display smoke all passed [#44953940221](https://github.com/mok9900/roblox/actions/runs/44953940221). New authenticated GitHub-hosted Windows run [#44954027272](https://github.com/mok9900/roblox/actions/runs/44954027272) began at 2026-11-22 06:55 KST. **Refresh its real-time status/jobs/logs before claiming success or retrying.** Critical evidence markers: `MCP_PREF_SAFE_DIAG`, `MCP_FIRST_PARTY_PREF_RESTART_RESULT`, `MCP_OFFICIAL_LAUNCHER_VERIFIED`, `STUDIO_MCP_SETUP_AND_TUNNEL_DOCTOR_VERIFIED`, `TUNNEL_FOREGROUND_STARTED`, and exact local `ci_only_baseplate_test` through connected Roblox_Studio tool.
 
 The existing GitHub Actions `roblox-mcp-ai-handoff.yml` reporter posts each completed run's safe outcome automatically to Issue #1, but no coding agent acts while the chat is closed. Never start concurrent 2FA runs or change published Places.
+
+
+## 2026-11-22 07:43 KST — live run checkpoint (not final proof)
+
+- Official GitHub-hosted Windows workflow [#44954027272](https://github.com/mok9900/roblox/actions/runs/44954027272), job `136998032907`: **in_progress**.
+- GitHub job-step API reports step 9 `Verify Roblox email 2FA, local Baseplate, official Assistant MCP and tunnel doctor` **completed/success**, and step 10 `Run verified OpenAI Secure MCP Tunnel (GitHub-hosted foreground)` **in_progress**. This is a new gate-level milestone compared with previous failures, but is NOT proof of a live MCP client handshake or local `ci_only_baseplate_test` enumeration.
+- Job log retrieval returned GitHub 404 `BlobNotFound` while job is running. No raw logs or secrets were retrieved; exact `MCP_PREF_SAFE_DIAG`, `MCP_OFFICIAL_LAUNCHER_VERIFIED` and doctor markers remain pending log inspection after completion.
+- No code change or additional authenticated workflow run; avoid overlap. Next check: refresh job and retrieve sanitized log markers when available, then invoke `list_roblox_studios` for exact local CI fixture and a safe read-only MCP call. Do not claim completion from step status alone.
