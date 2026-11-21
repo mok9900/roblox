@@ -61,7 +61,7 @@ class MCPUIAControlTypeTests(unittest.TestCase):
         ctx = self.base()
         target = FakeControl("AI Assistant", "Button")
         ctx["controls"] = lambda: [target]
-        pattern = re.compile(r"(?:ai\\s+)?assistant", re.I)
+        pattern = re.compile(r"(?:ai\s+)?assistant", re.I)
         self.assertTrue(ctx["click_unique"](pattern, timeout=0.2))
         self.assertEqual(target.click_count, 1)
 
