@@ -71,6 +71,9 @@ jobs:
           print("GMAIL_READONLY_PREFLIGHT_SUCCEEDED: fresh token and mailbox scope verified; no message printed.")
           '@ | python -
           if ($LASTEXITCODE -ne 0) { throw 'GMAIL_READONLY_PREFLIGHT_FAILED' }
+      - name: Expand GitHub-hosted Windows display for full Roblox Assistant mezzanine
+        shell: pwsh
+        run: ./ci/assisted/configure-hosted-display.ps1
       - name: Set narrow official Roblox Studio browser callback policy
         shell: pwsh
         run: ./ci/assisted/configure-edge.ps1
