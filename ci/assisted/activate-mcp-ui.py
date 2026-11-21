@@ -236,15 +236,14 @@ def hover_discover_assistant():
     except Exception:
         print("MCP_VISUAL_DIAG: optional_fast_path_unavailable", flush=True)
     try:
-        wr = win.rectangle()
-        if wr.width() < 700 or wr.height() < 500:
-            return False
-        # Use the same verified foreground activation as the visual
-        # path. UIA set_focus alone failed on the latest hosted runner.
+        # Resize ONLY the uniquely verified local CI editor before probing.
         from assistant_visual import focus_verified_editor
         from wgc_sendinput_probe import user32
         if not focus_verified_editor(win, user32):
             print("MCP_HOVER_SAFE_DIAG: verified_editor_not_foreground", flush=True)
+            return False
+        wr = win.rectangle()
+        if wr.width() < 700 or wr.height() < 500:
             return False
         # Clear any previously visible tooltip before probing.
         mouse.move(coords=(wr.left + wr.width()//2, wr.top + 240))
@@ -359,6 +358,20 @@ def enable_toggle():
 
 
 print("MCP_SETUP: local editor required; locating official Assistant.", flush=True)
+# The default GitHub Windows desktop is 1024x768. A wider display alone
+# does not expand Studio's existing editor window, so maximize the unique
+# local CI Baseplate BEFORE inspecting its top-right custom-drawn buttons.
+editors = [w for w in studio_windows()
+           if "ci_only_baseplate_test" in (w.window_text() or "").lower()]
+if len(editors) != 1:
+    raise SystemExit("MCP_EDITOR_NOT_UNIQUE_FOR_FOREGROUND")
+from assistant_visual import focus_verified_editor
+from wgc_sendinput_probe import user32
+if not focus_verified_editor(editors[0], user32):
+    raise SystemExit("MCP_EDITOR_FOREGROUND_NOT_READY")
+editor_rect = editors[0].rectangle()
+print("MCP_EDITOR_MAXIMIZED: width=%d height=%d" %
+      (editor_rect.width(), editor_rect.height()), flush=True)
 safe_diagnostics("initial")
 if launcher_ready():
     print("MCP_OFFICIAL_LAUNCHER_ALREADY_PRESENT", flush=True)
