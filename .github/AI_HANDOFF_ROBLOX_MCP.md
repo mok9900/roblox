@@ -99,3 +99,11 @@ The next AI should explicitly verify and update these fields in GitHub Issue #1 
 - next smallest safe code change and associated test
 
 **Durable handoff mechanism:** `main/AGENTS.md` → Issue #1 → `feature/AGENTS.md` → this runbook. No dependence on chat session memory.
+
+## 8. Automatic checkpointing for future sessions
+
+The default branch also contains `.github/workflows/roblox-mcp-ai-handoff.yml`, a **separate GitHub-hosted Ubuntu Actions workflow** triggered by completion of `Roblox Studio MCP - GitHub-hosted Windows only`. It has minimal `contents: read` and `issues: write` permissions. It posts to [Issue #1](https://github.com/mok9900/roblox/issues/1) with only the run ID, completion timestamp, conclusion and link.
+
+It does **not** read/private-post GitHub Actions logs, Roblox credentials, Gmail data or OTPs, and it does not start an AI model, schedule follow-up runs, or assert MCP readiness. The next AI must still inspect actual run logs and update the issue manually with evidence. Verify reporter operation by checking Issue #1 after the next **completed** hosted Studio run.
+
+Never treat the reporter as a self-hosted runner. It uses `ubuntu-latest`, a GitHub-hosted runner, only for posting safe status metadata.
