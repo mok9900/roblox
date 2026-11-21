@@ -57,6 +57,14 @@ class MCPUIAControlTypeTests(unittest.TestCase):
         self.assertTrue(ctx["click_unique"](re.compile("assistant"), timeout=0.2))
         self.assertEqual(target.click_count, 1)
 
+    def test_official_ai_assistant_title_can_be_clicked_when_unique(self):
+        ctx = self.base()
+        target = FakeControl("AI Assistant", "Button")
+        ctx["controls"] = lambda: [target]
+        pattern = re.compile(r"(?:ai\\s+)?assistant", re.I)
+        self.assertTrue(ctx["click_unique"](pattern, timeout=0.2))
+        self.assertEqual(target.click_count, 1)
+
     def test_click_unique_overflow_menuitem_explicit_types(self):
         ctx = self.base()
         target = FakeControl("…", "MenuItem")
