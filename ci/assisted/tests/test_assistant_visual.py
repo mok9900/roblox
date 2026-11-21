@@ -1,4 +1,5 @@
 """Credential-free policy tests for visual Studio Assistant discovery."""
+import ctypes
 import importlib.util
 import pathlib
 import unittest
@@ -107,7 +108,7 @@ class StudioForegroundGuardTests(unittest.TestCase):
         self.assertTrue(ok)
         self.assertGreaterEqual(api.set_calls, 1)
         self.assertEqual(api.GetForegroundWindow(), editor.handle)
-        self.assertEqual(api.SetWindowPos.calls[-1][1], -2)
+        self.assertEqual(api.SetWindowPos.calls[-1][1], ctypes.c_void_p(-2).value)
 
     def test_unverified_title_is_never_focused(self):
         api = self.FakeUser32()
@@ -121,7 +122,7 @@ class StudioForegroundGuardTests(unittest.TestCase):
         editor = self.FakeEditor()
         self.assertFalse(mod.focus_verified_editor(editor, api, pause=lambda _: None))
         self.assertEqual(api.GetForegroundWindow(), 42)
-        self.assertEqual(api.SetWindowPos.calls[-1][1], -2)
+        self.assertEqual(api.SetWindowPos.calls[-1][1], ctypes.c_void_p(-2).value)
 
     def test_invalid_window_handle_rejected(self):
         api = self.FakeUser32()
