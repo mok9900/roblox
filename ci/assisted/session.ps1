@@ -65,6 +65,32 @@ $assistantPluginRoot = Join-Path $env:LOCALAPPDATA 'Roblox\OTAPlugins\Deployed\B
 $assistantBundle = Join-Path $assistantPluginRoot 'Assistant.rbxm'
 $assistantExists = Test-Path -LiteralPath $assistantBundle -PathType Leaf
 Write-Host "MCP_ASSISTANT_PLUGIN_SAFE_DIAG: official_assistant_bundle_present=$assistantExists"
+# The official Assistant may be delivered with Studio's signed version
+# rather than an OTA patch. Check both locations and only print boolean
+# status and safe error counts; never print Roblox logs or account data.
+$assetDiag = (& python .\ci\assisted\probe-assistant-assets.py | Out-String).Trim()
+if ($LASTEXITCODE -ne 0) { throw 'ASSISTANT_ASSET_SAFE_PROBE_FAILED' }
+Write-Host $assetDiag
+# Roblox Studio developers recommend restarting Studio on plugin-load
+# failures. A missing file in both known roots on an ephemeral runner
+# justifies ONE bounded fresh-launch attempt; no cache deletion, account
+# bypass, tampering with signed assets or persistent user games.
+if ($assetDiag -match 'ota_present=false' -and $assetDiag -match 'version_present=false') {
+    Write-Host 'ASSISTANT_BUNDLE_RECHECK: no official asset in known locations; one signed Studio restart.'
+    Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 6
+    Start-Process -FilePath $env:STUDIO_EXE | Out-Null
+    Start-Sleep -Seconds 16
+    # Relaunch only the same pinned local CI fixture via official EditFile.
+    ./ci/assisted/open-test-place-cli.ps1
+    if ($LASTEXITCODE -ne 0) {
+        throw 'ASSISTANT_RECHECK_LOCAL_EDITOR_NOT_VERIFIED'
+    }
+    $assetDiagAfter = (& python .\ci\assisted\probe-assistant-assets.py | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'ASSISTANT_RECHECK_ASSET_PROBE_FAILED' }
+    Write-Host "ASSISTANT_BUNDLE_RECHECK_RESULT: $assetDiagAfter"
+}
 $mcpBatch = Join-Path $env:LOCALAPPDATA 'Roblox\mcp.bat'
 $mcpExe = Join-Path (Split-Path -Parent $env:STUDIO_EXE) 'StudioMCP.exe'
 Write-Host "MCP_RUNTIME_SAFE_DIAG: official_launcher_present=$(Test-Path -LiteralPath $mcpBatch), installed_binary_present=$(Test-Path -LiteralPath $mcpExe)"
