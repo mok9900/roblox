@@ -1,0 +1,55 @@
+name: Roblox MCP - AI handoff status reporter
+
+# A separate GitHub-hosted post-run job preserves only safe run metadata.
+# Never fetches login logs, Roblox credentials, Gmail, Studio files, or
+# unredacted screenshots. It never triggers a new Studio authentication.
+on:
+  workflow_run:
+    workflows:
+      - Roblox Studio MCP - GitHub-hosted Windows only
+    types:
+      - completed
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  report-to-ai-handoff:
+    if: ${{ github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Leave safe completion metadata on AI handoff issue #1
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const run = context.payload.workflow_run;
+            const allowed = new Set(['success', 'failure', 'cancelled', 'timed_out', 'neutral', 'skipped', 'action_required', 'startup_failure']);
+            const conclusion = allowed.has(run.conclusion) ? run.conclusion : 'unknown';
+            const id = Number(run.id);
+            if (!Number.isSafeInteger(id) || id <= 0) {
+              core.setFailed('Invalid workflow run ID');
+              return;
+            }
+            const url = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${id}`;
+            const body = [
+              '### Automated GitHub-hosted Studio MCP run checkpoint',
+              '',
+              `- Run: [#${id}](${url})`,
+              `- GitHub Actions conclusion: **${conclusion}**`,
+              `- Completed at: ${new Date().toISOString()}`,
+              '',
+              'This post records **workflow metadata only**. It does not prove an Assistant/MCP/Tunnel handshake.',
+              'Next AI must fetch this run\'s steps and redacted diagnostic markers, then update the handoff checklist.',
+              'Never infer success solely from a green workflow or from an unrelated cloud Roblox Studio Place.',
+              ''
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 1,
+              body
+            });
+            core.info(`AI handoff checkpoint posted for run ${id} (${conclusion})`);
