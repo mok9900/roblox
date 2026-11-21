@@ -94,6 +94,37 @@ class GmailCodeTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "GMAIL_OAUTH_OR_API_INVALID_GRANT"):
                 mod._json_request(mod.TOKEN_URL, form={"grant_type": "refresh_token"})
 
+    def test_gmail_api_not_enabled_error_is_classified_without_details(self):
+        error = urllib.error.HTTPError(
+            mod.MAIL_URL, 403, "Forbidden", {},
+            io.BytesIO(b'{"error":{"code":403,"status":"PERMISSION_DENIED",'
+                       b'"message":"private email address",'
+                       b'"details":[{"reason":"SERVICE_DISABLED","metadata":{"consumer":"private"}}]}}'))
+        with patch.object(mod.urllib.request, "urlopen", side_effect=error):
+            with self.assertRaisesRegex(RuntimeError, "API_NOT_ENABLED") as caught:
+                mod._json_request(mod.MAIL_URL, token="private-access-token")
+        self.assertNotIn("private", str(caught.exception))
+
+    def test_gmail_insufficient_scope_is_classified_without_message(self):
+        error = urllib.error.HTTPError(
+            mod.MAIL_URL, 403, "Forbidden", {},
+            io.BytesIO(b'{"error":{"code":403,"status":"PERMISSION_DENIED",'
+                       b'"errors":[{"reason":"insufficientPermissions","message":"private"}]}}'))
+        with patch.object(mod.urllib.request, "urlopen", side_effect=error):
+            with self.assertRaisesRegex(RuntimeError, "INSUFFICIENT_OAUTH_SCOPES"):
+                mod._json_request(mod.MAIL_URL, token="private-access-token")
+
+    def test_unknown_gmail_error_details_are_never_logged(self):
+        error = urllib.error.HTTPError(
+            mod.MAIL_URL, 403, "Forbidden", {},
+            io.BytesIO(b'{"error":{"code":403,"status":"PERMISSION_DENIED",'
+                       b'"message":"private data", "details":[{"reason":"untrusted-private-value"}]}}'))
+        with patch.object(mod.urllib.request, "urlopen", side_effect=error):
+            with self.assertRaisesRegex(RuntimeError, "PERMISSION_DENIED") as caught:
+                mod._json_request(mod.MAIL_URL, token="private-access-token")
+        self.assertNotIn("untrusted", str(caught.exception))
+        self.assertNotIn("private", str(caught.exception))
+
     def test_oauth_client_id_must_not_be_client_secret(self):
         with patch.dict(mod.os.environ, {
             "GMAIL_OAUTH_CLIENT_ID": "GOCSPX-demo",
