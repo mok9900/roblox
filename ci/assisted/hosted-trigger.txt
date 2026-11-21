@@ -2,3 +2,5 @@
 
 2026-11-21 08:xx KST: owner confirms Client Secret rotation and completion of Gmail OAuth repository secrets. Run official GitHub-hosted Windows Actions preflight and, only on success, Studio sign-in, Gmail 2FA, Baseplate, Assistant MCP and tunnel. Never expose credentials or OTP.
 2026-11-21 GitHub-hosted OAuth diagnostic retry after safe Google error classification update. No unverified Roblox credential submission: OAuth preflight must pass first.
+
+2026-11-21 17:21 KST: account owner confirms corrected Google OAuth client credentials and refresh token. Retry GitHub-hosted Windows official Gmail OAuth preflight; proceed with real Studio sign-in and MCP only if all preflight gates pass. No self-hosted runner and no secrets in logs.
