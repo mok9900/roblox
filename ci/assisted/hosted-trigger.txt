@@ -8,3 +8,5 @@
 2026-11-21 KST: user requests another real hosted-only run after verifying OAuth Playground custom client settings. Fail closed at Gmail preflight if OAuth credentials remain invalid; otherwise continue official Roblox 2FA and MCP. No secrets logged.
 
 2026-11-21 owner confirms newly refreshed Gmail OAuth refresh token. Re-run GitHub-hosted Windows workflow; OAuth preflight must pass before Roblox 2FA / Studio / MCP / tunnel. No local runner, no credential disclosures.
+
+2026-11-21 hosted rerun with safe Gmail API nested 403 diagnostics enabled. Access token refresh succeeds; classify Gmail API service disabled, missing scopes, or policy and stop before Roblox login unless actual Gmail access succeeds.
