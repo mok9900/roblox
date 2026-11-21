@@ -214,3 +214,28 @@ If consent testing restrictions or a revocation affect the token, reauthorize
 the user in that OAuth client. The existing workflow can be rerun after
 the secret is replaced. No additional unauthenticated retries should run
 until the credential change is made.
+
+## 2026-11-21: Gmail 403 root cause confirmed on actual hosted Windows runner
+
+On run [44885580219](https://github.com/mok9900/roblox/actions/runs/44885580219),
+the OAuth refresh-token grant **succeeded**, but Gmail
+`users.messages.list` returned HTTP 403. Enhanced the Gmail API error
+parser to allowlist only Google's nested standard error reason enums
+(never raw response bodies), plus synthetic regression tests against
+service-disabled, missing-scopes, and private arbitrary errors.
+
+The subsequent live GitHub-hosted run
+[44885698708](https://github.com/mok9900/roblox/actions/runs/44885698708)
+confirmed **`GMAIL_OAUTH_OR_API_API_NOT_ENABLED`**.
+This is a Google Cloud API activation issue, **not** a reason to rotate
+Client ID, Client Secret, or refresh token again.
+
+The owner must select the Google Cloud project that owns OAuth client
+`RS w GA A` and **enable Gmail API** at:
+https://console.cloud.google.com/apis/library/gmail.googleapis.com
+
+After enabling the API, rerun the main-branch
+`Roblox Studio MCP - GitHub-hosted Windows only` workflow.
+Do not send credentials, refresh tokens, authorization codes or email OTP
+values in chat. The hosted script will proceed to official Roblox login
+and MCP only if the Gmail API preflight succeeds. No self-hosted runner.
