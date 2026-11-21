@@ -14,6 +14,51 @@ import time
 EXACT_ASSISTANT = re.compile(r"^(?:assistant|어시스턴트)$", re.I)
 
 
+def focus_verified_editor(win, user32, *, pause=time.sleep):
+    """Make ONLY the uniquely verified local CI Baseplate editor foreground.
+
+    A plain UIA set_focus is insufficient on GitHub-hosted Windows in some
+    Studio builds. This uses the restore/temporary-topmost sequence already
+    proven in visual-browser-login.py and always undoes the topmost flag.
+    The guarded caller must have identified exactly one local test editor.
+    """
+    import ctypes as ct
+
+    try:
+        if "ci_only_baseplate_test" not in (win.window_text() or "").lower():
+            return False
+        hwnd = int(win.handle)
+        if hwnd <= 0 or not user32.IsWindow(hwnd):
+            return False
+        user32.SetWindowPos.argtypes = [
+            ct.c_void_p, ct.c_void_p, ct.c_int, ct.c_int,
+            ct.c_int, ct.c_int, ct.c_uint
+        ]
+        user32.SetWindowPos.restype = ct.c_int
+        flags = 0x0001 | 0x0002 | 0x0040  # no resize/move, show
+        user32.ShowWindow(hwnd, 9)         # SW_RESTORE
+        try:
+            for _ in range(3):
+                if user32.GetForegroundWindow() == hwnd:
+                    return True
+                try:
+                    win.set_focus()
+                except Exception:
+                    pass
+                user32.SetWindowPos(hwnd, ct.c_void_p(-1), 0, 0, 0, 0, flags)
+                user32.SetForegroundWindow(hwnd)
+                pause(.5)
+                if user32.GetForegroundWindow() == hwnd:
+                    return True
+                pause(.7)
+        finally:
+            # Reverting topmost is mandatory even after failures.
+            user32.SetWindowPos(hwnd, ct.c_void_p(-2), 0, 0, 0, 0, flags)
+        return user32.GetForegroundWindow() == hwnd
+    except Exception:
+        return False
+
+
 def unique_tooltip_near_pointer(items, pointer, *, region):
     """Pure selector: items=(text, confidence, x0, y0, x1, y1).
 
@@ -76,9 +121,8 @@ def try_visual_assistant(win):
         rect = win.rectangle()
         if rect.width() < 700 or rect.height() < 500:
             return False
-        win.set_focus()
-        if user32.GetForegroundWindow() != win.handle:
-            print("MCP_VISUAL_DIAG: editor_not_foreground", flush=True)
+        if not focus_verified_editor(win, user32):
+            print("MCP_VISUAL_DIAG: editor_not_foreground_after_guarded_activation", flush=True)
             return False
 
         engine = RapidOCR()
