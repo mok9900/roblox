@@ -124,6 +124,115 @@ def ocr_items(engine, rgb_image, offset):
     return out
 
 
+def unique_mcp_status_position(items, *, region):
+    """Verify exact 'MCP' in Studio's bottom-right status strip.
+
+    Only use on the sole identified local CI Baseplate editor. Reject other
+    OCR text, weak confidence, oversized regions, and multiple matches.
+    Return the *label center* for a guarded click; never guess pixels.
+    """
+    left, top, right, bottom = region
+    matches = []
+    for text, conf, x0, y0, x1, y1 in items:
+        if " ".join(str(text).split()).casefold() != "mcp" or conf < .90:
+            continue
+        if not (left <= x0 < x1 <= right and top <= y0 < y1 <= bottom):
+            continue
+        if not (13 <= x1 - x0 <= 130 and 8 <= y1 - y0 <= 56):
+            continue
+        matches.append((int((x0 + x1) / 2), int((y0 + y1) / 2)))
+    return matches[0] if len(matches) == 1 else None
+
+
+def try_mcp_status_settings(win):
+    """Open *official* MCP settings from Studio's November 2026 status badge.
+
+    Official Roblox documentation confirms the bottom-right MCP status
+    control opens Assistant settings. This avoids locating the custom-drawn
+    top-right Assistant icon, which multiple CI runs could not discover.
+    All pixels remain inside this local process, with no saved screenshots
+    or unredacted OCR text in logs.
+    """
+    try:
+        import dxcam
+        import numpy as np
+        from PIL import Image
+        from rapidocr import RapidOCR
+        from wgc_sendinput_probe import click_abs, user32
+    except ImportError:
+        print("MCP_STATUS_DIAG: local_ocr_runtime_unavailable", flush=True)
+        return False
+    if "ci_only_baseplate_test" not in (win.window_text() or "").lower():
+        print("MCP_STATUS_DIAG: unverified_editor", flush=True)
+        return False
+    if not focus_verified_editor(win, user32):
+        print("MCP_STATUS_DIAG: editor_not_foreground", flush=True)
+        return False
+
+    rect = win.rectangle()
+    cam = None
+    try:
+        cam = dxcam.create(backend="dxgi", output_color="RGB",
+                           processor_backend="numpy")
+        engine = RapidOCR()
+        frame = cam.grab(new_frame_only=False)
+        if frame is None:
+            print("MCP_STATUS_DIAG: frame_unavailable", flush=True)
+            return False
+        a = np.asarray(frame)
+        height, width = a.shape[:2]
+        # The official badge is in the *status strip* at bottom-right of
+        # the verified local Studio editor, never the content viewport.
+        region = (max(0, int(rect.left + .55 * rect.width())),
+                  max(0, int(rect.bottom - 135)),
+                  min(width, int(rect.right - 5)),
+                  min(height, int(rect.bottom - 3)))
+        l, t, r, b = region
+        if r - l < 180 or b - t < 70:
+            print("MCP_STATUS_DIAG: region_unavailable", flush=True)
+            return False
+        # Scale small status-bar fonts for OCR; map bounding boxes back to
+        # absolute display coordinates before any guarded mouse action.
+        scale = 3
+        tile = Image.fromarray(a[t:b, l:r, :].copy())
+        tile = tile.resize(((r-l)*scale, (b-t)*scale))
+        result = ocr_items(engine, np.asarray(tile), (0, 0))
+        restored = [(name, score, l + x0 / scale, t + y0 / scale,
+                     l + x1 / scale, t + y1 / scale)
+                    for name, score, x0, y0, x1, y1 in result]
+        point = unique_mcp_status_position(restored, region=region)
+        print("MCP_STATUS_DIAG: ocr_items=%d verified_label=%s" %
+              (len(restored), bool(point)), flush=True)
+        if point is None or user32.GetForegroundWindow() != win.handle:
+            return False
+        # Verify the same exact label is still visible on a fresh DXGI frame.
+        time.sleep(.35)
+        follow = cam.grab(new_frame_only=False)
+        if follow is None:
+            return False
+        nexttile = Image.fromarray(np.asarray(follow)[t:b, l:r, :].copy())
+        nexttile = nexttile.resize(((r-l)*scale, (b-t)*scale))
+        nextitems = ocr_items(engine, np.asarray(nexttile), (0, 0))
+        mapped = [(name, score, l + x0 / scale, t + y0 / scale,
+                   l + x1 / scale, t + y1 / scale)
+                  for name, score, x0, y0, x1, y1 in nextitems]
+        confirmed = unique_mcp_status_position(mapped, region=region)
+        if confirmed is None or abs(confirmed[0]-point[0]) > 18 or abs(confirmed[1]-point[1]) > 18:
+            print("MCP_STATUS_DIAG: label_second_observation_failed", flush=True)
+            return False
+        if user32.GetForegroundWindow() != win.handle:
+            return False
+        click_abs(*confirmed)
+        print("MCP_STATUS_SETTINGS_OPEN_REQUESTED: verified bottom-right MCP status control", flush=True)
+        return True
+    except Exception:
+        print("MCP_STATUS_DIAG: guarded_probe_unavailable", flush=True)
+        return False
+    finally:
+        if cam is not None:
+            cam.release()
+
+
 def try_visual_assistant(win):
     """Nonpersistent DXGI scan; click only on verified Assistant hover tooltip."""
     try:
