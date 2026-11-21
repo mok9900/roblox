@@ -19,6 +19,14 @@ class AssistantTooltipPolicyTest(unittest.TestCase):
         self.assertTrue(near([("Assistant", .99, 890, 95, 982, 120)],
                              POINT, region=REGION))
 
+    def test_exact_ai_assistant_tooltip_matches_official_label(self):
+        self.assertTrue(near([("AI Assistant", .99, 890, 95, 994, 120)],
+                             POINT, region=REGION))
+
+    def test_ai_assistant_settings_is_not_an_icon_tooltip(self):
+        self.assertFalse(near([("AI Assistant Settings", .99, 890, 95, 1050, 120)],
+                              POINT, region=REGION))
+
     def test_verified_exact_korean_tooltip(self):
         self.assertTrue(near([("어시스턴트", .95, 890, 92, 993, 119)],
                              POINT, region=REGION))
