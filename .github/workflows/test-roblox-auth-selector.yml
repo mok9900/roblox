@@ -13,6 +13,7 @@ on:
       - ci/assisted/assistant_visual.py
       - ci/assisted/session.ps1
       - ci/assisted/configure-edge.ps1
+      - ci/assisted/configure-hosted-display.ps1
       - ci/assisted/check-studio-auth-protocol.ps1
       - ci/assisted/tests/test_email_method.py
       - ci/assisted/tests/test_visual_twofactor.py
@@ -50,7 +51,7 @@ jobs:
         run: |
           $tokens = $null
           $parseErrors = $null
-          $paths = @('.\\ci\\assisted\\session.ps1', '.\\ci\\assisted\\configure-edge.ps1', '.\\ci\\assisted\\check-studio-auth-protocol.ps1')
+          $paths = @('.\\ci\\assisted\\session.ps1', '.\\ci\\assisted\\configure-edge.ps1', '.\\ci\\assisted\\configure-hosted-display.ps1', '.\\ci\\assisted\\check-studio-auth-protocol.ps1')
           foreach ($path in $paths) {
             $resolved = (Resolve-Path $path).Path
             [System.Management.Automation.Language.Parser]::ParseFile($resolved, [ref]$tokens, [ref]$parseErrors) | Out-Null
@@ -83,3 +84,13 @@ jobs:
         run: |
           python .\\ci\\assisted\\tests\\ocr_runtime_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'ASSISTANT_OCR_RUNTIME_SMOKE_FAILED' }
+
+  display-mode-smoke:
+    name: GitHub-hosted Windows desktop resolution smoke (no credentials)
+    runs-on: windows-2022
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Expand temporary GitHub-hosted Windows display if supported
+        shell: pwsh
+        run: ./ci/assisted/configure-hosted-display.ps1
