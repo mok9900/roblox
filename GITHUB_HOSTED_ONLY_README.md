@@ -239,3 +239,13 @@ After enabling the API, rerun the main-branch
 Do not send credentials, refresh tokens, authorization codes or email OTP
 values in chat. The hosted script will proceed to official Roblox login
 and MCP only if the Gmail API preflight succeeds. No self-hosted runner.
+
+## 2026-11-21: GitHub-hosted Studio 2FA + Baseplate success; Assistant focus failure
+
+Hosted run 44886034785 successfully refreshed Gmail OAuth, accessed Gmail readonly, installed signed Studio and OpenAI tunnel-client, submitted the native Studio login form, fetched and entered the newly issued Roblox 2FA email code via Gmail API, verified signed-in Studio and opened the pinned local-only Baseplate. No published Place was modified.
+
+Actual log evidence: EMAIL_2FA_STUDIO_LOGIN_SUCCEEDED and PLACE_EDITOR_VERIFIED.
+
+The run failed when launching Assistant: MCP_VISUAL_DIAG: editor_not_foreground and ASSISTANT_UI_NOT_ACCESSIBLE. The official mcp.bat and OpenAI Tunnel handshake were not verified.
+
+The follow-up fix adds a guarded HWND foreground restore plus temporary-topmost activation (with mandatory topmost cleanup), reusing an earlier hosted Windows technique. Only the unique verified local Baseplate editor is activated; no unknown UI targets are clicked. Regression tests cover foreground acceptance/refusal and rejection of unrelated editor windows. A new hosted authenticated run is required for actual Assistant verification.
