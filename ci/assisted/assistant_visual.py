@@ -86,12 +86,16 @@ def unique_tooltip_near_pointer(items, pointer, *, region):
         return False
     matches = []
     for name, score, x0, y0, x1, y1 in items:
-        if not tooltip_heading(name) or score < .88:
+        if not tooltip_heading(name):
+            continue
+        # Preserve high confidence for exact short labels; allow a slight
+        # reduction only for multi-line descriptions that OCR merges.
+        merged = not bool(EXACT_ASSISTANT.fullmatch(" ".join(str(name).split())))
+        if score < (.88 if merged else .91):
             continue
         if not (left <= x0 < x1 <= right and top <= y0 < y1 <= bottom):
             continue
         # A merged heading+description may be a larger OCR rectangle.
-        merged = not bool(EXACT_ASSISTANT.fullmatch(" ".join(str(name).split())))
         if x1 - x0 > (420 if merged else 195) or y1 - y0 > (125 if merged else 65):
             continue
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
