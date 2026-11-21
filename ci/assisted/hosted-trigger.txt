@@ -24,3 +24,5 @@
 2026-11-21: integration retry after official November Roblox MCP bottom-right status badge discovery. OCR recognizes unique exact badge twice and opens settings; log Assistant OTA bundle presence. Green credential-free tests 44894550263; use only GitHub-hosted Windows, preserve official 2FA and local CI Baseplate, no secrets logged.
 
 2026-11-21: another official GitHub-hosted Windows Studio MCP retry after real run 44894614558 proved no Assistant in known OTA root; new safe probe checks OTA and version install roots and sanitized Assistant plugin load failures, and one guarded Studio restart with pinned local Baseplate if missing. Exact bottom-right MCP client-count OCR also validated. All CI tests 44896491085 passed; no self-hosted runner.
+
+2026-11-22: GitHub-hosted Windows authenticated integration retry after first-party Roblox AssistantSettings MCP opt-in experiment. 118 synthetic Python tests, Windows PowerShell parse, OCR, 1080p smoke all green in #44953940221. Do not fabricate mcp.bat or bypass MFA. Validate Roblox itself generates launcher and tunnel doctor after local-only Baseplate; only then start official OpenAI Tunnel. Next AI handoff issue #1.
