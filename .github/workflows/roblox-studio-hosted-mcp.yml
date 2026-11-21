@@ -87,11 +87,22 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check --quiet 'cryptography>=44,<48'
           if ($LASTEXITCODE -ne 0) { throw 'CRYPTOGRAPHY_IMPORT_UNAVAILABLE' }
-      - name: Official Roblox email 2FA → local Baseplate → Assistant MCP → tunnel
+      - name: Verify Roblox email 2FA, local Baseplate, official Assistant MCP and tunnel doctor
         shell: pwsh
+        timeout-minutes: 32
         env:
           GH_TOKEN: ${{ github.token }}
           GMAIL_OAUTH_CLIENT_ID: ${{ secrets.GMAIL_OAUTH_CLIENT_ID }}
           GMAIL_OAUTH_CLIENT_SECRET: ${{ secrets.GMAIL_OAUTH_CLIENT_SECRET }}
           GMAIL_OAUTH_REFRESH_TOKEN: ${{ secrets.GMAIL_OAUTH_REFRESH_TOKEN }}
+          ROBLOX_MCP_SETUP_ONLY: '1'
         run: ./ci/assisted/session.ps1
+      - name: Run verified OpenAI Secure MCP Tunnel (GitHub-hosted foreground)
+        shell: pwsh
+        run: |
+          if (-not $env:TUNNEL_EXE -or -not (Test-Path -LiteralPath $env:TUNNEL_EXE)) {
+            throw 'TUNNEL_BINARY_MISSING_AFTER_SUCCESSFUL_SETUP'
+          }
+          Write-Host 'TUNNEL_FOREGROUND_STARTED: doctor gate already verified in preceding step.'
+          & $env:TUNNEL_EXE run --profile 'roblox-studio-ci'
+          if ($LASTEXITCODE -ne 0) { throw 'OPENAI_SECURE_MCP_TUNNEL_EXITED_UNSUCCESSFULLY' }
