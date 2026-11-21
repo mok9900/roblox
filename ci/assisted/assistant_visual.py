@@ -14,6 +14,21 @@ import time
 EXACT_ASSISTANT = re.compile(r"^(?:(?:ai\s+)?assistant|어시스턴트)$", re.I)
 
 
+def tooltip_heading(text):
+    """Recognize the documented hover heading, not arbitrary Assistant prose.
+
+    RapidOCR may merge the title with its descriptive tooltip sentence.
+    Only the official AI Assistant + "Chat with Studio Assistant" form
+    is accepted in that case. Reject settings, sidebars and generic prose.
+    """
+    line = " ".join(str(text).split()).strip()
+    if EXACT_ASSISTANT.fullmatch(line):
+        return True
+    return bool(re.match(
+        r"^AI Assistant\s+Chat with Studio Assistant\b", line, re.I
+    ))
+
+
 def focus_verified_editor(win, user32, *, pause=time.sleep):
     """Make ONLY the uniquely verified local CI Baseplate editor foreground.
 
@@ -71,14 +86,18 @@ def unique_tooltip_near_pointer(items, pointer, *, region):
         return False
     matches = []
     for name, score, x0, y0, x1, y1 in items:
-        if not EXACT_ASSISTANT.fullmatch(str(name).strip()) or score < .91:
+        if not tooltip_heading(name) or score < .88:
             continue
         if not (left <= x0 < x1 <= right and top <= y0 < y1 <= bottom):
             continue
-        if x1 - x0 > 170 or y1 - y0 > 55:
+        # A merged heading+description may be a larger OCR rectangle.
+        merged = not bool(EXACT_ASSISTANT.fullmatch(" ".join(str(name).split())))
+        if x1 - x0 > (420 if merged else 195) or y1 - y0 > (125 if merged else 65):
             continue
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-        if abs(cx - x) <= 155 and abs(cy - y) <= 105:
+        # Tooltips near the top-right corner may extend to the left to
+        # remain on-screen, rather than centering under the hovered icon.
+        if abs(cx - x) <= 260 and abs(cy - y) <= 170:
             matches.append((x0, y0, x1, y1))
     return len(matches) == 1
 
@@ -154,15 +173,17 @@ def try_visual_assistant(win):
             if baseline is None:
                 print("MCP_VISUAL_DIAG: dxgi_frame_unavailable", flush=True)
                 return False
-            if any(EXACT_ASSISTANT.fullmatch(str(a[0]).strip())
-                   for a in baseline[0]):
+            if any(tooltip_heading(a[0]) for a in baseline[0]):
                 print("MCP_VISUAL_DIAG: static_assistant_text_ambiguous", flush=True)
                 return False
 
             scanned = 0
-            # Hover is non-mutating. Never click a guessed icon location.
-            for yoff in (43, 77, 111):
-                for ratio in (.60, .67, .74, .81, .88, .95):
+            text_hints = 0
+            # The Assistant sparkles icon is in Studio's TOP-RIGHT
+            # mezzanine, beside sharing and notifications. Hover-only.
+            # Include the final 2-4% used by compact-width Studio builds.
+            for yoff in (43, 72, 103):
+                for ratio in (.70, .78, .84, .89, .93, .96, .985):
                     point = (int(rect.left + rect.width() * ratio),
                              int(rect.top + yoff))
                     if not (baseline[1][0] <= point[0] < baseline[1][2]
@@ -171,13 +192,17 @@ def try_visual_assistant(win):
                     if user32.GetForegroundWindow() != win.handle:
                         return False
                     mouse.move(coords=point)
-                    time.sleep(.45)
+                    time.sleep(.85)
                     first = read()
                     scanned += 1
-                    if first is None or not unique_tooltip_near_pointer(
+                    if first is None:
+                        continue
+                    if any(tooltip_heading(item[0]) for item in first[0]):
+                        text_hints += 1
+                    if not unique_tooltip_near_pointer(
                             first[0], point, region=first[1]):
                         continue
-                    time.sleep(.35)
+                    time.sleep(.5)
                     second = read()
                     if second is None or not unique_tooltip_near_pointer(
                             second[0], point, region=second[1]):
@@ -189,7 +214,7 @@ def try_visual_assistant(win):
                     click_abs(*point)
                     print("MCP_ASSISTANT_OPEN_REQUESTED: DXGI exact tooltip double-check + guarded SendInput", flush=True)
                     return True
-            print("MCP_VISUAL_DIAG: scanned=%d tooltip_verified=False" % scanned, flush=True)
+            print("MCP_VISUAL_DIAG: scanned=%d text_hints=%d tooltip_verified=False" % (scanned, text_hints), flush=True)
         finally:
             if cam is not None:
                 cam.release()
