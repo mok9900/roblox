@@ -48,6 +48,82 @@ if p.returncode != 0 or p.stdout.strip() != "SAFE_STDIO_CHILD_STARTED":
 print("STDIO_WINDOWS_CREATEPROCESS_CMD_DISPATCH_VERIFIED")
 '@ | python -
     if ($LASTEXITCODE -ne 0) { throw 'STDIO_WINDOWS_ARGV_SMOKE_FAILED' }
+    # Profile regression guard: passing a synthetic CreateProcess argv is
+    # insufficient if the actual tunnel profile regresses to nested quoting.
+    # This reads source only. It never starts Roblox, tunnel-client or 2FA.
+    $sessionSource = Get-Content -LiteralPath 'ci/assisted/session.ps1' -Raw
+    $expectedCommand = '(?m)^\s*\$mcpCommand\s*=\s*''cmd\.exe /d /c roblox-mcp-stdio\.cmd''\s*    $command = 'cmd.exe /d /c roblox-mcp-stdio.cmd'
+    if ($command -match '["\\\x27%&|]' -or $command.Split(' ').Count -ne 4) {
+        throw 'STDIO_TUNNEL_COMMAND_NOT_SHLEX_SAFE'
+    }
+    Write-Host 'STDIO_TUNNEL_SHLEX_SAFE_COMMAND_VERIFIED'
+    # Execute the REAL checked-in bridge under a synthetic LOCALAPPDATA
+    # where Roblox has never generated mcp.bat. It MUST fail closed.
+    # This is not an MCP server emulator and creates no Roblox launcher.
+    $env:STUDIO_PROBE_REPOSITORY = (Resolve-Path '.').Path
+    $env:STUDIO_PROBE_EMPTY_APPDATA = Join-Path $working 'blank local appdata'
+    New-Item -ItemType Directory -Force -Path $env:STUDIO_PROBE_EMPTY_APPDATA | Out-Null
+    @'
+import os, subprocess
+env = os.environ.copy()
+env["LOCALAPPDATA"] = env["STUDIO_PROBE_EMPTY_APPDATA"]
+p = subprocess.run(["cmd.exe", "/d", "/c", "roblox-mcp-stdio.cmd"],
+                   cwd=env["STUDIO_PROBE_REPOSITORY"], env=env,
+                   capture_output=True, text=True, timeout=10)
+if p.returncode != 13 or "STUDIO_MCP_OFFICIAL_LAUNCHER_MISSING" not in p.stderr:
+    raise SystemExit("STDIO_OFFICIAL_LAUNCHER_GUARD_FAILED")
+if p.stdout.strip():
+    raise SystemExit("STDIO_MUST_NOT_POLLUTE_JSONRPC_STDOUT_ON_LAUNCHER_MISS")
+print("STDIO_REAL_BRIDGE_MISSING_OFFICIAL_LAUNCHER_FAIL_CLOSED")
+'@ | python -
+    if ($LASTEXITCODE -ne 0) { throw 'STDIO_REAL_BRIDGE_FAIL_CLOSED_TEST_FAILED' }
+} finally {
+    Remove-Item Env:STUDIO_PROBE_DIR -ErrorAction SilentlyContinue
+    Remove-Item Env:STUDIO_PROBE_WORKDIR -ErrorAction SilentlyContinue
+    Remove-Item Env:STUDIO_PROBE_REPOSITORY -ErrorAction SilentlyContinue
+    Remove-Item Env:STUDIO_PROBE_EMPTY_APPDATA -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $working -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+    if ($sessionSource -notmatch $expectedCommand) {
+        throw 'STDIO_SESSION_PROFILE_COMMAND_REGRESSED'
+    }
+    if ($sessionSource -notmatch '(?m)^\s*Set-Location -LiteralPath \$env:GITHUB_WORKSPACE\s*    $command = 'cmd.exe /d /c roblox-mcp-stdio.cmd'
+    if ($command -match '["\\\x27%&|]' -or $command.Split(' ').Count -ne 4) {
+        throw 'STDIO_TUNNEL_COMMAND_NOT_SHLEX_SAFE'
+    }
+    Write-Host 'STDIO_TUNNEL_SHLEX_SAFE_COMMAND_VERIFIED'
+    # Execute the REAL checked-in bridge under a synthetic LOCALAPPDATA
+    # where Roblox has never generated mcp.bat. It MUST fail closed.
+    # This is not an MCP server emulator and creates no Roblox launcher.
+    $env:STUDIO_PROBE_REPOSITORY = (Resolve-Path '.').Path
+    $env:STUDIO_PROBE_EMPTY_APPDATA = Join-Path $working 'blank local appdata'
+    New-Item -ItemType Directory -Force -Path $env:STUDIO_PROBE_EMPTY_APPDATA | Out-Null
+    @'
+import os, subprocess
+env = os.environ.copy()
+env["LOCALAPPDATA"] = env["STUDIO_PROBE_EMPTY_APPDATA"]
+p = subprocess.run(["cmd.exe", "/d", "/c", "roblox-mcp-stdio.cmd"],
+                   cwd=env["STUDIO_PROBE_REPOSITORY"], env=env,
+                   capture_output=True, text=True, timeout=10)
+if p.returncode != 13 or "STUDIO_MCP_OFFICIAL_LAUNCHER_MISSING" not in p.stderr:
+    raise SystemExit("STDIO_OFFICIAL_LAUNCHER_GUARD_FAILED")
+if p.stdout.strip():
+    raise SystemExit("STDIO_MUST_NOT_POLLUTE_JSONRPC_STDOUT_ON_LAUNCHER_MISS")
+print("STDIO_REAL_BRIDGE_MISSING_OFFICIAL_LAUNCHER_FAIL_CLOSED")
+'@ | python -
+    if ($LASTEXITCODE -ne 0) { throw 'STDIO_REAL_BRIDGE_FAIL_CLOSED_TEST_FAILED' }
+} finally {
+    Remove-Item Env:STUDIO_PROBE_DIR -ErrorAction SilentlyContinue
+    Remove-Item Env:STUDIO_PROBE_WORKDIR -ErrorAction SilentlyContinue
+    Remove-Item Env:STUDIO_PROBE_REPOSITORY -ErrorAction SilentlyContinue
+    Remove-Item Env:STUDIO_PROBE_EMPTY_APPDATA -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $working -Recurse -Force -ErrorAction SilentlyContinue
+}
+) {
+        throw 'STDIO_SESSION_WORKSPACE_CWD_GUARD_MISSING'
+    }
+    Write-Host 'STDIO_SESSION_PROFILE_AND_WORKSPACE_GUARDS_VERIFIED'
     # GitHub's own feature+main workflow invokes the child from repo CWD.
     $command = 'cmd.exe /d /c roblox-mcp-stdio.cmd'
     if ($command -match '["\\\x27%&|]' -or $command.Split(' ').Count -ne 4) {
