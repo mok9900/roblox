@@ -99,6 +99,9 @@ jobs:
         run: ./ci/assisted/session.ps1
       - name: Run verified OpenAI Secure MCP Tunnel (GitHub-hosted foreground)
         shell: pwsh
+        env:
+          # OpenAI tunnel-client otherwise restarts a broken stdio child forever.
+          MCP_STDIO_FAILURE_POLICY: exit
         run: |
           if (-not $env:TUNNEL_EXE -or -not (Test-Path -LiteralPath $env:TUNNEL_EXE)) {
             throw 'TUNNEL_BINARY_MISSING_AFTER_SUCCESSFUL_SETUP'
@@ -108,6 +111,6 @@ jobs:
             throw 'STUDIO_MCP_STDIO_BRIDGE_MISSING_AFTER_SETUP'
           }
           Set-Location -LiteralPath $env:GITHUB_WORKSPACE
-          Write-Host 'TUNNEL_FOREGROUND_STARTED: doctor gate verified; child launcher is first-party Roblox mcp.bat via quote-free bridge.'
+          Write-Host 'TUNNEL_FOREGROUND_STARTED: doctor gate verified; child launcher is first-party Roblox mcp.bat via quote-free bridge; fail-fast enabled.'
           & $env:TUNNEL_EXE run --profile 'roblox-studio-ci'
           if ($LASTEXITCODE -ne 0) { throw 'OPENAI_SECURE_MCP_TUNNEL_EXITED_UNSUCCESSFULLY' }
