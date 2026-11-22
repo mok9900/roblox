@@ -150,6 +150,10 @@ $bridge = Join-Path $env:GITHUB_WORKSPACE 'roblox-mcp-stdio.cmd'
 if (-not (Test-Path -LiteralPath $bridge -PathType Leaf)) {
     throw 'STUDIO_MCP_STDIO_BRIDGE_NOT_FOUND'
 }
+# cmd.exe resolves the bridge from the process working directory.
+# Pin it explicitly so the tunnel process launched in the NEXT Actions
+# step uses the same location. No username or file path is logged.
+Set-Location -LiteralPath $env:GITHUB_WORKSPACE
 $mcpCommand = 'cmd.exe /d /c roblox-mcp-stdio.cmd'
 Write-Host 'MCP_STDIO_BRIDGE_PROFILE_VERIFIED: quote_free_command=true official_launcher_required=true'
 $profileName = 'roblox-studio-ci'
