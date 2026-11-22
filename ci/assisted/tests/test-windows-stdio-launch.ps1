@@ -54,8 +54,30 @@ print("STDIO_WINDOWS_CREATEPROCESS_CMD_DISPATCH_VERIFIED")
         throw 'STDIO_TUNNEL_COMMAND_NOT_SHLEX_SAFE'
     }
     Write-Host 'STDIO_TUNNEL_SHLEX_SAFE_COMMAND_VERIFIED'
+    # Execute the REAL checked-in bridge under a synthetic LOCALAPPDATA
+    # where Roblox has never generated mcp.bat. It MUST fail closed.
+    # This is not an MCP server emulator and creates no Roblox launcher.
+    $env:STUDIO_PROBE_REPOSITORY = (Resolve-Path '.').Path
+    $env:STUDIO_PROBE_EMPTY_APPDATA = Join-Path $working 'blank local appdata'
+    New-Item -ItemType Directory -Force -Path $env:STUDIO_PROBE_EMPTY_APPDATA | Out-Null
+    @'
+import os, subprocess
+env = os.environ.copy()
+env["LOCALAPPDATA"] = env["STUDIO_PROBE_EMPTY_APPDATA"]
+p = subprocess.run(["cmd.exe", "/d", "/c", "roblox-mcp-stdio.cmd"],
+                   cwd=env["STUDIO_PROBE_REPOSITORY"], env=env,
+                   capture_output=True, text=True, timeout=10)
+if p.returncode != 13 or "STUDIO_MCP_OFFICIAL_LAUNCHER_MISSING" not in p.stderr:
+    raise SystemExit("STDIO_OFFICIAL_LAUNCHER_GUARD_FAILED")
+if p.stdout.strip():
+    raise SystemExit("STDIO_MUST_NOT_POLLUTE_JSONRPC_STDOUT_ON_LAUNCHER_MISS")
+print("STDIO_REAL_BRIDGE_MISSING_OFFICIAL_LAUNCHER_FAIL_CLOSED")
+'@ | python -
+    if ($LASTEXITCODE -ne 0) { throw 'STDIO_REAL_BRIDGE_FAIL_CLOSED_TEST_FAILED' }
 } finally {
     Remove-Item Env:STUDIO_PROBE_DIR -ErrorAction SilentlyContinue
     Remove-Item Env:STUDIO_PROBE_WORKDIR -ErrorAction SilentlyContinue
+    Remove-Item Env:STUDIO_PROBE_REPOSITORY -ErrorAction SilentlyContinue
+    Remove-Item Env:STUDIO_PROBE_EMPTY_APPDATA -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $working -Recurse -Force -ErrorAction SilentlyContinue
 }
