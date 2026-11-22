@@ -1,1 +1,3 @@
 2026-11-22T08:59:40Z authorized diagnostic stop for live run 45004368586. Cause: tunnel foreground alive >5 minutes, but official read-only Roblox_Studio list still reports tunnel-client not seen for 300 seconds. No other authenticated run may overlap. Stop old hosted run to retrieve sanitized logs and classify control-plane vs stdio child issue before another auth attempt.
+
+2026-11-22T09:00:27Z: retry after fixing YAML parser block scalar; cancel unreachable hosted tunnel run to collect final logs. No new Roblox login.
