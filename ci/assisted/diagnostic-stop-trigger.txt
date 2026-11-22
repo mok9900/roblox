@@ -3,3 +3,5 @@
 2026-11-22T09:00:27Z: retry after fixing YAML parser block scalar; cancel unreachable hosted tunnel run to collect final logs. No new Roblox login.
 
 2026-11-22 09:22Z: diagnostic stop for authenticated run #45005765068 after verified Studio/Doctor green but >10min tunnel step with Roblox_Studio connector still reporting tunnel-client unseen for 300 seconds; no credentials or games changed. Capture completed sanitized logs and fix first failing gate before any new login.
+
+2026-11-22 18:45 KST: diagnostic stop authorized for hosted run #45007915428 after Studio 2FA, pinned local Baseplate, Assistant MCP and Tunnel Doctor all succeeded, but ChatGPT read-only list_roblox_studios still returned tunnel-client-not-seen-for-300-seconds while foreground tunnel remained running. Stop to retrieve bounded loopback health samples; no new auth run and no secrets exposed.
