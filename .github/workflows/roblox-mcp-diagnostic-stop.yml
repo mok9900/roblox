@@ -20,4 +20,5 @@ jobs:
     steps:
       - name: Confirm existing hosted run is stopped before diagnostic rerun
         shell: pwsh
-        run: Write-Host 'DIAGNOSTIC_STOP_REQUESTED: GitHub concurrency cancelled the prior long-running hosted tunnel to permit sanitized post-run log inspection.'
+        run: |
+          Write-Host 'DIAGNOSTIC_STOP_REQUESTED: GitHub concurrency cancelled the prior long-running hosted tunnel to permit sanitized post-run log inspection.'
