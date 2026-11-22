@@ -27,6 +27,8 @@ on:
       - ci/assisted/otp_relay.py
       - ci/assisted/tests/test_gmail_otp.py
       - ci/assisted/tests/ocr_runtime_smoke.py
+      - ci/assisted/tests/test-windows-stdio-launch.ps1
+      - roblox-mcp-stdio.cmd
       - .github/workflows/test-roblox-auth-selector.yml
   workflow_dispatch:
 permissions:
@@ -98,3 +100,16 @@ jobs:
       - name: Expand temporary GitHub-hosted Windows display if supported
         shell: pwsh
         run: ./ci/assisted/configure-hosted-display.ps1
+  
+  windows-stdio-bridge-smoke:
+    name: Windows stdio child quoting and cwd test (no credentials)
+    runs-on: windows-2022
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify quote-free cmd child dispatch with directories containing spaces
+        shell: pwsh
+        run: ./ci/assisted/tests/test-windows-stdio-launch.ps1
