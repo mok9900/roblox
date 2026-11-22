@@ -28,6 +28,8 @@ on:
       - ci/assisted/tests/test_gmail_otp.py
       - ci/assisted/tests/ocr_runtime_smoke.py
       - ci/assisted/tests/test-windows-stdio-launch.ps1
+      - ci/assisted/bootstrap-studio-mcp-auth.ps1
+      - ci/assisted/tests/test-studio-mcp-auth-priming.ps1
       - roblox-mcp-stdio.cmd
       - .github/workflows/test-roblox-auth-selector.yml
   workflow_dispatch:
@@ -113,3 +115,6 @@ jobs:
       - name: Verify quote-free cmd child dispatch with directories containing spaces
         shell: pwsh
         run: ./ci/assisted/tests/test-windows-stdio-launch.ps1
+      - name: Check official Roblox StudioMCP token priming without account login
+        shell: pwsh
+        run: ./ci/assisted/tests/test-studio-mcp-auth-priming.ps1
