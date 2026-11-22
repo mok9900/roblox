@@ -141,7 +141,17 @@ if (-not (Test-Path -LiteralPath $mcpBatch)) { throw 'Studio MCP official launch
 Write-Host 'Initializing a named OpenAI Secure MCP Tunnel stdio profile.'
 # OpenAI documentation requires init --profile before run --profile.
 # Keep the tunnel runtime API key in the inherited environment, not CLI args.
-$mcpCommand = 'cmd.exe /d /s /c "cd /d ""%LOCALAPPDATA%\Roblox"" && call mcp.bat"'
+# The official OpenAI Go parser treats backslashes as escape characters
+# in --mcp-command (and its cmd.exe arguments must survive *two* parsers).
+# Using a command with NO quotes/backslashes avoids corrupting Windows
+# paths. The tracked bridge calls ONLY Roblox's verified mcp.bat; it never
+# writes or replaces that official launcher.
+$bridge = Join-Path $env:GITHUB_WORKSPACE 'roblox-mcp-stdio.cmd'
+if (-not (Test-Path -LiteralPath $bridge -PathType Leaf)) {
+    throw 'STUDIO_MCP_STDIO_BRIDGE_NOT_FOUND'
+}
+$mcpCommand = 'cmd.exe /d /c roblox-mcp-stdio.cmd'
+Write-Host 'MCP_STDIO_BRIDGE_PROFILE_VERIFIED: quote_free_command=true official_launcher_required=true'
 $profileName = 'roblox-studio-ci'
 & $env:TUNNEL_EXE init --sample sample_mcp_stdio_local --profile $profileName --tunnel-id $env:CONTROL_PLANE_TUNNEL_ID --mcp-command $mcpCommand
 if ($LASTEXITCODE -ne 0) { throw 'OpenAI tunnel profile initialization failed.' }
