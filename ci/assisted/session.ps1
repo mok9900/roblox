@@ -138,6 +138,27 @@ if (-not (Test-Path -LiteralPath $mcpBatch)) {
     Write-Host 'MCP_OFFICIAL_LAUNCHER_ALREADY_PRESENT: validating via official tunnel doctor.'
 }
 if (-not (Test-Path -LiteralPath $mcpBatch)) { throw 'Studio MCP official launcher absent after UI check.' }
+# Roblox's enforced StudioMCP WebSocket auth now requires the official
+# per-user auth.token. A fresh ephemeral runner may launch Studio BEFORE
+# StudioMCP has ever generated this file. Then Studio sends no Authorization
+# header and the official proxy reports reason=no_auth_header (HTTP 401).
+# Prime the token using ONLY the Roblox-generated launcher, without reading
+# or changing its contents, keeping enforcement fully enabled.
+Write-Host 'MCP_AUTH_BOOTSTRAP: priming official StudioMCP token before final Studio restart.'
+./ci/assisted/bootstrap-studio-mcp-auth.ps1
+Write-Host 'MCP_AUTH_TOKEN_STUDIO_RESTART: restarting signed Studio so it can read its existing token.'
+Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue |
+    Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 5
+Start-Process -FilePath $env:STUDIO_EXE | Out-Null
+Start-Sleep -Seconds 15
+# Re-open only the same pinned local CI fixture. Never touch a cloud Place.
+./ci/assisted/open-test-place-cli.ps1
+if ($LASTEXITCODE -ne 0) { throw 'MCP_AUTH_TOKEN_RESTART_BASEPLATE_NOT_VERIFIED' }
+if (-not (Test-Path -LiteralPath $mcpBatch -PathType Leaf)) {
+    throw 'MCP_AUTH_TOKEN_RESTART_OFFICIAL_LAUNCHER_MISSING'
+}
+Write-Host 'MCP_AUTH_TOKEN_STUDIO_RESTART_VERIFIED: original local Baseplate and launcher present.'
 Write-Host 'Initializing a named OpenAI Secure MCP Tunnel stdio profile.'
 # OpenAI documentation requires init --profile before run --profile.
 # Keep the tunnel runtime API key in the inherited environment, not CLI args.
