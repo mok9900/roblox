@@ -1,0 +1,65 @@
+name: Roblox MCP - isolated OpenAI tunnel channel test (no Roblox login)
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ci/assisted/tunnel-probe-trigger.txt
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: roblox-studio-openai-tunnel-single-instance
+  cancel-in-progress: false
+jobs:
+  isolate-openai-control-plane:
+    runs-on: windows-2022
+    timeout-minutes: 8
+    env:
+      CONTROL_PLANE_API_KEY: ${{ secrets.OPENAI_TUNNEL_RUNTIME_KEY }}
+      CONTROL_PLANE_TUNNEL_ID: ${{ secrets.OPENAI_TUNNEL_ID }}
+      CONTROL_PLANE_POLL_CHANNELS: main
+    steps:
+      - name: Checkout current proven GitHub-hosted diagnostic source
+        uses: actions/checkout@v4
+        with:
+          ref: feature/studio-openai-tunnel-assisted
+          persist-credentials: false
+      - name: Require only OpenAI tunnel runtime secret presence without printing
+        shell: pwsh
+        run: |
+          if (-not $env:CONTROL_PLANE_API_KEY -or -not $env:CONTROL_PLANE_TUNNEL_ID) {
+            throw 'TUNNEL_ONLY_RUNTIME_SECRETS_MISSING'
+          }
+          Write-Host 'TUNNEL_ONLY_RUNTIME_SECRETS_PRESENT: no Roblox password or 2FA required.'
+      - name: Install checksum-verified official OpenAI tunnel-client only
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./ci/assisted/install-tunnel-only.ps1
+      - name: Isolate OpenAI control-plane health with self-contained safe MCP fixture
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          if (-not $env:TUNNEL_EXE -or -not (Test-Path -LiteralPath $env:TUNNEL_EXE)) {
+            throw 'TUNNEL_ONLY_BINARY_NOT_VERIFIED'
+          }
+          # The official embedded MCP stub has no access to any Roblox game.
+          # This test determines control-plane registration independent of Studio login.
+          $out = Join-Path $env:RUNNER_TEMP 'openai-embedded-stub-stdout.tmp'
+          $err = Join-Path $env:RUNNER_TEMP 'openai-embedded-stub-stderr.tmp'
+          $proc = Start-Process -FilePath $env:TUNNEL_EXE -ArgumentList @(
+            'run','--embedded-stateless-mcp-stub','--control-plane.poll-channel=main'
+          ) -WorkingDirectory $env:GITHUB_WORKSPACE -NoNewWindow -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+          try {
+            Write-Host 'TUNNEL_STUB_ISOLATION_STARTED: official self-contained demo only; not Roblox MCP success.'
+            ./ci/assisted/tunnel-health-probe.ps1 -Samples 12 -IntervalSeconds 10
+            if ($proc.HasExited) {
+              throw 'TUNNEL_STUB_ISOLATION_PROCESS_EXITED: inspect sanitized component health; raw logs intentionally not printed.'
+            }
+            Write-Host 'TUNNEL_STUB_ISOLATION_COMPLETE: only local health observed; actual Roblox Studio still needs separate verification.'
+          } finally {
+            if (-not $proc.HasExited) { $proc.Kill($true); [void]$proc.WaitForExit(5000) }
+            $proc.Dispose()
+            Remove-Item -LiteralPath $out,$err -Force -ErrorAction SilentlyContinue
+          }
