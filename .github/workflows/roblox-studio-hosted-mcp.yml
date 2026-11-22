@@ -102,6 +102,9 @@ jobs:
         env:
           # OpenAI tunnel-client otherwise restarts a broken stdio child forever.
           MCP_STDIO_FAILURE_POLICY: exit
+          # Only the local Roblox Studio MCP `main` channel is used.
+          # Explicitly bypass optional Harpoon target-catalog startup gating.
+          CONTROL_PLANE_POLL_CHANNELS: main
         run: |
           if (-not $env:TUNNEL_EXE -or -not (Test-Path -LiteralPath $env:TUNNEL_EXE)) {
             throw 'TUNNEL_BINARY_MISSING_AFTER_SUCCESSFUL_SETUP'
