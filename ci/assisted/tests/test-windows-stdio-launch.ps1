@@ -56,6 +56,10 @@ print("STDIO_WINDOWS_CREATEPROCESS_CMD_DISPATCH_VERIFIED")
     if (-not $sessionSource.Contains('Set-Location -LiteralPath $env:GITHUB_WORKSPACE')) {
         throw 'STDIO_SESSION_WORKSPACE_CWD_GUARD_MISSING'
     }
+    if (-not $sessionSource.Contains('$env:MCP_STDIO_FAILURE_POLICY = ''exit''')) {
+        throw 'STDIO_SESSION_FAIL_FAST_GUARD_MISSING'
+    }
+    Write-Host 'STDIO_SESSION_FAIL_FAST_GUARD_VERIFIED'
     Write-Host 'STDIO_SESSION_PROFILE_AND_WORKSPACE_GUARDS_VERIFIED'
     # GitHub's own feature+main workflow invokes the child from repo CWD.
     $command = 'cmd.exe /d /c roblox-mcp-stdio.cmd'
