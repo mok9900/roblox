@@ -31,6 +31,7 @@ on:
       - ci/assisted/bootstrap-studio-mcp-auth.ps1
       - ci/assisted/tests/test-studio-mcp-auth-priming.ps1
       - ci/assisted/tunnel-health-probe.ps1
+      - ci/assisted/install-tunnel-only.ps1
       - ci/assisted/tests/test-tunnel-health-source.ps1
       - roblox-mcp-stdio.cmd
       - .github/workflows/test-roblox-auth-selector.yml
