@@ -1,0 +1,23 @@
+name: Roblox MCP - diagnostic stop of stuck hosted tunnel
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ci/assisted/diagnostic-stop-trigger.txt
+permissions:
+  contents: read
+# A fresh operator-authorized diagnostic stop cancels the active hosted Studio
+# workflow in the SAME concurrency group, allowing final logs to be retrieved.
+# No Roblox login, tunnels, user games, or secrets in this no-auth job.
+concurrency:
+  group: roblox-studio-openai-tunnel-single-instance
+  cancel-in-progress: true
+jobs:
+  cancel-active-studio-diagnostic:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - name: Confirm existing hosted run is stopped before diagnostic rerun
+        shell: pwsh
+        run: Write-Host 'DIAGNOSTIC_STOP_REQUESTED: GitHub concurrency cancelled the prior long-running hosted tunnel to permit sanitized post-run log inspection.'
