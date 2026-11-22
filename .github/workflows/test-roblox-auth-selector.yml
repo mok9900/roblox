@@ -30,6 +30,8 @@ on:
       - ci/assisted/tests/test-windows-stdio-launch.ps1
       - ci/assisted/bootstrap-studio-mcp-auth.ps1
       - ci/assisted/tests/test-studio-mcp-auth-priming.ps1
+      - ci/assisted/tunnel-health-probe.ps1
+      - ci/assisted/tests/test-tunnel-health-source.ps1
       - roblox-mcp-stdio.cmd
       - .github/workflows/test-roblox-auth-selector.yml
   workflow_dispatch:
@@ -118,3 +120,6 @@ jobs:
       - name: Check official Roblox StudioMCP token priming without account login
         shell: pwsh
         run: ./ci/assisted/tests/test-studio-mcp-auth-priming.ps1
+      - name: Validate local tunnel health diagnostics are read-only and credential-safe
+        shell: pwsh
+        run: ./ci/assisted/tests/test-tunnel-health-source.ps1
