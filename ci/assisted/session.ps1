@@ -169,6 +169,11 @@ if ($env:ROBLOX_MCP_SETUP_ONLY -eq '1') {
     Write-Host 'STUDIO_MCP_SETUP_AND_TUNNEL_DOCTOR_VERIFIED: stopping at completed setup gate.'
     exit 0
 }
+# The tunnel client's default auto-restart would hide a bad stdio child in
+# thousands of repeated logs. Fail visibly, without looping on a broken
+# Roblox-generated launcher; this does not interfere with healthy MCP sessions.
+$env:MCP_STDIO_FAILURE_POLICY = 'exit'
+Write-Host 'TUNNEL_STDIO_FAIL_FAST_ENABLED: unexpected child failure ends the tunnel process.'
 Write-Host 'TUNNEL_STARTING: OpenAI Secure MCP Tunnel is connecting.'
 & $env:TUNNEL_EXE run --profile $profileName
 if ($LASTEXITCODE -ne 0) { throw 'OpenAI tunnel-client exited unsuccessfully.' }
