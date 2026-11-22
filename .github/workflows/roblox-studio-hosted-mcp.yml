@@ -114,6 +114,14 @@ jobs:
             throw 'STUDIO_MCP_STDIO_BRIDGE_MISSING_AFTER_SETUP'
           }
           Set-Location -LiteralPath $env:GITHUB_WORKSPACE
+          $probe = Join-Path $env:GITHUB_WORKSPACE 'ci/assisted/tunnel-health-probe.ps1'
+          if (-not (Test-Path -LiteralPath $probe -PathType Leaf)) {
+            throw 'TUNNEL_LOCAL_HEALTH_PROBE_SCRIPT_MISSING'
+          }
+          # Sidecar prints only whitelisted health enums/counters from loopback.
+          # It never invokes any MCP tools, reads secrets, or changes Studio.
+          Start-Process -FilePath 'pwsh.exe' -NoNewWindow -ArgumentList ('-NoProfile -NonInteractive -File "' + $probe + '" -Samples 12 -IntervalSeconds 10') | Out-Null
+          Write-Host 'TUNNEL_LOCAL_HEALTH_SAMPLER_STARTED: read-only sanitized snapshots; 12 checks at 10-second spacing.'
           Write-Host 'TUNNEL_FOREGROUND_STARTED: doctor gate verified; child launcher is first-party Roblox mcp.bat via quote-free bridge; fail-fast enabled.'
           & $env:TUNNEL_EXE run --profile 'roblox-studio-ci'
           if ($LASTEXITCODE -ne 0) { throw 'OPENAI_SECURE_MCP_TUNNEL_EXITED_UNSUCCESSFULLY' }
