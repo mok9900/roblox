@@ -16,11 +16,15 @@
 - Main push trigger path: `ci/assisted/hosted-trigger.txt` (the workflow also supports `workflow_dispatch`).
 - User only wants Github-hosted Windows Actions; the old self-hosted proposal is obsolete.
 
-## Next actions
-1. Refresh run [#44889043027](https://github.com/mok9900/roblox/actions/runs/44889043027), fetch job logs when completed and classify `EMAIL_2FA_*`, `PLACE_EDITOR_*`, `MCP_*`, `ASSISTANT_*`, `TUNNEL_*` markers. This was the first full-HD 1920×1080 integration at snapshot time (Nov 21, 2026 KST); its state can change.
-2. Fix only the earliest unsatisfied gate, add tests and verify them using GitHub-hosted Actions.
-3. Launch no overlapping authenticated Studio sessions. The documented single-instance concurrency group exists for this reason.
-4. Update [Issue #1](https://github.com/mok9900/roblox/issues/1) and the feature runbook with exact verified outcomes, run IDs, error markers and relevant commits, without secrets.
-5. Do not mark complete until the local **CI Baseplate** is seen through MCP, not just an existing unrelated cloud Studio.
+## Verified checkpoint — 2026-11-23 19:50 KST
+
+- Latest authenticated hosted Windows Studio run: [#45007915428](https://github.com/mok9900/roblox/actions/runs/45007915428), job `137163540483`, **completed/cancelled after diagnostics** (do not mistake cancellation for Studio login failure). The official Gmail 2FA, local Baseplate, official Roblox-generated launcher, auth token initialization, OpenAI tunnel doctor and stdio MCP startup all passed.
+- Local tunnel was `ready=true` on **12/12** checks, with control-plane `polling, ok` for **9/12** checks; MCP discovery stayed `not_observed` on **12/12**. ChatGPT's connected `Roblox_Studio.list_roblox_studios` failed `Tunnel-client has not been seen for 300 seconds` even while the tunnel was polling in prior live checks.
+- **First unresolved gate:** ChatGPT **custom MCP app's actual Tunnel selection**, and Platform tunnel **ChatGPT workspace association / Tunnels Read + Use permissions**. The owned plugin package `plugin_asdk_app_6af977ff6cd8819197a693633993f550` exposes only alias manifest files and NOT its backend transport binding. Therefore GitHub code edits, package-only changes or repeated Roblox logins cannot establish the missing association by themselves.
+- Existing intended Platform tunnel: `Roblox Studio MCP Auto Chatgpt with GitHub Action`. Official setup: [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels), ChatGPT Plugins → `+` → `Add custom MCP server` → `Connection: Tunnel`. Reuse the matching verified tunnel; avoid blindly replacing the plugin or regenerating credentials.
+- Last checked live GitHub Actions list contains no later authenticated Studio run. No authenticated run was started during this checkpoint. The owner explicitly removed the **self-imposed** fixed 24-hour cooldown; retain non-overlapping jobs and bounded legitimate login/2FA attempts.
+- **Next agent:** verify/fix app tunnel binding using an authorized signed-in ChatGPT/Platform UI session. Once corrected, execute no-auth 5-job GitHub-hosted regression; then start **one** real hosted Studio workflow. While its tunnel is running, call `list_roblox_studios` and require local `ci_only_baseplate_test` with `persistedToCloud=false`, then a harmless read-only MCP call. Update Issue #1 and the feature runbook with verified evidence only.
+
+**Historical note:** Earlier first-step instructions about run #44889043027 were superseded by subsequent tests. Do not follow them as current priorities.
 
 **This file is a durable instruction pointer, not proof of any currently running process or autonomous AI continuation.**
