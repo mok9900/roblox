@@ -130,6 +130,50 @@ def click_center(c):
     rect=c.rectangle()
     click_abs((rect.left+rect.right)//2,(rect.top+rect.bottom)//2)
 
+def verified_browser_origin(win):
+    """Only type into a visible official HTTPS Roblox page, never by title alone."""
+    from urllib.parse import urlsplit
+    found=set()
+    for c in win.descendants(control_type="Edit"):
+        try:
+            label=(c.element_info.name or "").strip().casefold()
+            if not c.is_visible() or not any(t in label for t in ("address and search","address bar","주소 및 검색","주소 표시줄")):
+                continue
+            value=str(c.get_value()).strip()
+            if not value.startswith("https://"):
+                continue
+            u=urlsplit(value)
+            if u.scheme=="https" and u.hostname in {"roblox.com","www.roblox.com","auth.roblox.com"} and not u.username and not u.password and u.port in (None,443):
+                found.add(u.hostname)
+        except Exception:
+            continue
+    return len(found)==1
+
+def submit_target(win, password_edit, require_enabled=False):
+    """Deduplicate identical UIA wrappers, require a single aligned submit target."""
+    p=password_edit.rectangle()
+    candidates={}
+    labels=0
+    for c in win.descendants():
+        try:
+            if not c.is_visible() or c.element_info.control_type!="Button":
+                continue
+            label=(c.element_info.name or "").strip().casefold()
+            if label not in ("sign in","log in","login","로그인"):
+                continue
+            labels+=1
+            r=c.rectangle()
+            overlap=max(0,min(r.right,p.right)-max(r.left,p.left))
+            if not (r.top>=p.bottom-2 and r.top-p.bottom<180 and r.height()>=18 and r.width()>=80 and overlap>=min(r.width(),p.width())*.75):
+                continue
+            if require_enabled and not c.is_enabled():
+                continue
+            key=(r.left,r.top,r.right,r.bottom)
+            candidates[key]=c
+        except Exception:
+            continue
+    return (next(iter(candidates.values())) if len(candidates)==1 else None,labels,len(candidates))
+
 # Installer may leave the Studio executable running before the welcome UI
 # has finished rendering. Retry only non-mutating WGC screenshots; never
 # submit any credentials until a unique expected blue CTA is present.
@@ -160,28 +204,42 @@ while time.monotonic()<deadline:
     time.sleep(2)
 if not form: raise SystemExit("ROBLOX_EDGE_TWO_INPUT_FORM_NOT_VERIFIED")
 win,edits=form
-print("ROBLOX_EDGE_FORM_VERIFIED: unique Roblox-title window and 2 credential input controls.",flush=True)
-try: win.set_focus()
-except Exception: pass
-time.sleep(.5)
+# No credentials until origin, foreground, and one physical submit target
+# have all been independently checked. UIA can duplicate the same rectangle.
+deadline=time.monotonic()+25
+target=None
+while time.monotonic()<deadline:
+    form=browser_form()
+    if form:
+        win,edits=form
+        if verified_browser_origin(win):
+            target,labels,unique=submit_target(win,edits[1])
+            print(f"ROBLOX_BROWSER_SUBMIT_SAFE_DIAG: labeled={labels} physical_targets={unique}",flush=True)
+            if target is not None:
+                break
+    time.sleep(2)
+if target is None:
+    raise SystemExit("ROBLOX_BROWSER_ORIGIN_OR_SUBMIT_UNVERIFIED: no credentials typed")
+if not focus_studio(win) or not verified_browser_origin(win):
+    raise SystemExit("ROBLOX_BROWSER_FOCUS_OR_ORIGIN_UNVERIFIED: no credentials typed")
+print("ROBLOX_EDGE_FORM_VERIFIED: official HTTPS origin and unique credential form and submit target.",flush=True)
 click_center(edits[0]);type_unicode(username)
 time.sleep(.3)
+if user32.GetForegroundWindow()!=win.handle:
+    raise SystemExit("ROBLOX_BROWSER_FOCUS_LOST: no further input")
 click_center(edits[1]);type_unicode(password)
 time.sleep(.5)
-# Require a unique visible submit button below the password field.
-buttons=[]
-for c in win.descendants():
-    try:
-        if not c.is_visible() or c.element_info.control_type!="Button": continue
-        label=(c.element_info.name or "").strip().lower()
-        rect=c.rectangle()
-        if (label in ("sign in","log in","login","로그인")
-            and rect.top>=edits[1].rectangle().bottom
-            and rect.top-edits[1].rectangle().bottom < 180):
-            buttons.append(c)
-    except Exception: pass
-if len(buttons)!=1:
+deadline=time.monotonic()+12
+target=None
+while time.monotonic()<deadline:
+    if user32.GetForegroundWindow()!=win.handle or not verified_browser_origin(win):
+        raise SystemExit("ROBLOX_BROWSER_FOCUS_OR_ORIGIN_CHANGED: no submit")
+    target,labels,unique=submit_target(win,edits[1],require_enabled=True)
+    if target is not None:
+        break
+    time.sleep(.5)
+if target is None:
     raise SystemExit("ROBLOX_BROWSER_SUBMIT_NOT_UNIQUE: credentials not submitted")
-click_center(buttons[0])
+click_center(target)
 print("ROBLOX_BROWSER_CREDENTIALS_SUBMITTED: official page button clicked, values not logged.",flush=True)
 username="";password=""
