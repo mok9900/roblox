@@ -3,3 +3,5 @@
 2026-11-27 — retry pre-login after OIDC request preservation and sanitized failure instrumentation; previous run never submitted credentials.
 
 2026-11-27 — retry once after browser submit selector hardening; prior attempt did not submit credentials. Require official HTTPS origin, exact single physical target and foreground window before typing.
+
+2026-11-27 — single integration retry with official-origin challenge detection and bounded safe form diagnostics (eaee128c).
