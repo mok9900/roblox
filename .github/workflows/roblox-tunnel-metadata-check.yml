@@ -1,0 +1,49 @@
+name: Roblox MCP - read-only tunnel identity check
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/roblox-tunnel-metadata-check.yml
+permissions: {}
+concurrency:
+  group: roblox-studio-openai-tunnel-single-instance
+  cancel-in-progress: false
+jobs:
+  identity:
+    runs-on: windows-2022
+    timeout-minutes: 4
+    steps:
+      - name: Verify intended OpenAI tunnel identity without exposing metadata
+        shell: pwsh
+        env:
+          CONTROL_PLANE_API_KEY: ${{ secrets.OPENAI_TUNNEL_RUNTIME_KEY }}
+          CONTROL_PLANE_TUNNEL_ID: ${{ secrets.OPENAI_TUNNEL_ID }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          if (-not $env:CONTROL_PLANE_API_KEY -or $env:CONTROL_PLANE_TUNNEL_ID -cnotmatch '^tunnel_(?:[a-z0-9]{4}_)?[a-z0-9]{32}$') {
+            throw 'TUNNEL_METADATA_CONFIG_INVALID'
+          }
+          # Official read-only metadata endpoint. No redirects, no raw response or error logging.
+          try {
+            $uri = 'https://api.openai.com/v1/tunnels/' + $env:CONTROL_PLANE_TUNNEL_ID
+            $response = Invoke-WebRequest -Uri $uri -Method Get -Headers @{ Authorization = ('Bearer ' + $env:CONTROL_PLANE_API_KEY) } -MaximumRedirection 0 -SkipHttpErrorCheck -TimeoutSec 30
+          } catch {
+            throw 'TUNNEL_METADATA_NETWORK_OR_REDIRECT_ERROR_REDACTED'
+          }
+          $status = [int]$response.StatusCode
+          Write-Host "TUNNEL_METADATA_HTTP_STATUS=$status"
+          if ($status -ne 200) { throw 'TUNNEL_METADATA_REQUEST_FAILED' }
+          try {
+            $meta = $response.Content | ConvertFrom-Json -ErrorAction Stop
+            $idMatch = ([string]$meta.id -ceq $env:CONTROL_PLANE_TUNNEL_ID)
+            $nameMatch = ([string]$meta.name -ceq 'Roblox Studio MCP Auto Chatgpt with GitHub Action')
+          } catch {
+            throw 'TUNNEL_METADATA_PARSE_ERROR_REDACTED'
+          }
+          Write-Host "TUNNEL_METADATA_ID_MATCH=$idMatch"
+          Write-Host "TUNNEL_METADATA_EXPECTED_NAME_MATCH=$nameMatch"
+          Write-Host 'TUNNEL_METADATA_WORKSPACE_BINDING_NOT_VERIFIED'
+          if (-not $idMatch -or -not $nameMatch) { throw 'TUNNEL_METADATA_IDENTITY_MISMATCH' }
+          Write-Host 'TUNNEL_METADATA_INTENDED_IDENTITY_VERIFIED'
