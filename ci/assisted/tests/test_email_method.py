@@ -10,14 +10,26 @@ import unittest
 SOURCE = pathlib.Path(__file__).resolve().parents[1] / "login-ui.py"
 tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
 selectors = [n for n in tree.body if isinstance(n, ast.FunctionDef)
-             and n.name in ("find_email_method", "select_challenge_host", "safe_choice_diagnostics", "in_browser_content", "find_code_edit", "find_browser_handoff", "find_protocol_consent")]
+             and n.name in ("find_email_method", "select_challenge_host", "safe_choice_diagnostics", "in_browser_content", "find_code_edit", "distinct_visible_edits", "verified_edge_origin", "find_browser_handoff", "find_protocol_consent")]
 
 
 class Control:
-    def __init__(self, typ, name="", children=None):
+    next_position = 0
+
+    def __init__(self, typ, name="", children=None, bounds=None, visible=True):
         self.typ = typ
         self.name = name.lower()
         self.children = list(children or [])
+        Control.next_position += 1
+        y = Control.next_position * 30
+        self.bounds = bounds or (0, y, 200, y+20)
+        self.visible = visible
+
+    def is_visible(self):
+        return self.visible
+
+    def rectangle(self):
+        return Rect(*self.bounds)
 
     def descendants(self):
         return list(self.children)
@@ -239,6 +251,36 @@ class EmailCodeFormTest(unittest.TestCase):
         self.assertEqual(find_code_edit([Control("Edit", "Email"), code]), [code])
 
 
+class ChallengeFieldSafetyTest(unittest.TestCase):
+    def test_duplicate_physical_field_is_collapsed(self):
+        rect = (40,200,240,240)
+        a = Control("Edit", "", bounds=rect)
+        b = Control("Edit", "Verification code", bounds=rect)
+        self.assertEqual(find_code_edit([a,b]), [b])
+
+    def test_invisible_duplicate_is_not_selected(self):
+        a = Control("Edit", "Verification code", visible=False)
+        b = Control("Edit", "Verification code")
+        self.assertEqual(find_code_edit([a,b]), [b])
+
+    def test_independent_captcha_is_rejected(self):
+        self.assertEqual(find_code_edit([Control("Edit","Verification code"), Control("Text","CAPTCHA")]), [])
+
+    def test_distinct_multiple_code_fields_remain_ambiguous(self):
+        self.assertEqual(find_code_edit([Control("Edit","Verification code"), Control("Edit","Verification code")]), [])
+
+    def test_official_https_origin_and_spoofed_origin(self):
+        def window(url):
+            c = Control("Edit","Address and search bar")
+            c.get_value = lambda: url
+            return type("Window", (), {"descendants": lambda self, **kw: [c]})()
+        verify = scope["verified_edge_origin"]
+        self.assertTrue(verify(window("https://www.roblox.com/login")))
+        self.assertFalse(verify(window("https://www.roblox.com.example.invalid/login")))
+        self.assertFalse(verify(window("http://www.roblox.com/login")))
+        self.assertFalse(verify(window("https://www.roblox.com@evil.invalid/login")))
+
+
 class BrowserHandoffSafetyTest(unittest.TestCase):
     def test_unique_explicit_studio_return_is_allowed(self):
         c = Control("Button", "Open Roblox Studio")
@@ -313,6 +355,12 @@ class BrowserProtocolConsentTest(unittest.TestCase):
 class Rect:
     def __init__(self,left,top,right,bottom):
         self.left, self.top, self.right, self.bottom = left,top,right,bottom
+
+    def width(self):
+        return self.right - self.left
+
+    def height(self):
+        return self.bottom - self.top
 
 
 class BrowserGeometryTest(unittest.TestCase):
