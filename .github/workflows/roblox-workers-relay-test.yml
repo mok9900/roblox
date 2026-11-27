@@ -22,6 +22,8 @@ jobs:
           $r = Invoke-WebRequest -Uri "$base/mcp" -Method Post -ContentType 'application/json' -Body $body -SkipHttpErrorCheck -MaximumRedirection 0
           if ($r.StatusCode -notin @(401,403,503)) { throw 'UNAUTHENTICATED_MCP_NOT_DENIED' }
           Write-Host "WORKERS_MCP_UNAUTHENTICATED_DENIED=$($r.StatusCode)"
+          if ($r.StatusCode -ne 401 -or -not $r.Headers['WWW-Authenticate']) { throw 'MANAGED_OAUTH_CHALLENGE_MISSING' }
+          Write-Host 'WORKERS_MANAGED_OAUTH_CHALLENGE_PRESENT'
           $r = Invoke-WebRequest -Uri "$base/mcp" -Method Post -ContentType 'application/json' -Body $body -Headers @{'Cf-Access-Jwt-Assertion'='forged.invalid.signature'} -SkipHttpErrorCheck -MaximumRedirection 0
           if ($r.StatusCode -notin @(401,403,503)) { throw 'FORGED_ACCESS_ASSERTION_NOT_DENIED' }
           Write-Host "WORKERS_MCP_FORGED_ASSERTION_DENIED=$($r.StatusCode)"
@@ -43,7 +45,7 @@ jobs:
             if ($r.StatusCode -ne 200) {
               try {
                 $reason = ($r.Content | ConvertFrom-Json).reason
-                if ($reason -in @('auth required','jwt invalid','alg invalid','key service unavailable','key fetch failed','key decode failed','token decode failed','key import failed','signature verification failed','key set invalid','key not found','signature invalid','claims invalid','workflow denied','run identity invalid','verification error')) { Write-Host "WORKERS_OIDC_STAGE=$reason" }
+                if ($reason -in @('auth required','jwt invalid','alg invalid','key service unavailable','key fetch failed','key redirect denied','key decode failed','token decode failed','key import failed','signature verification failed','key set invalid','key not found','signature invalid','claims invalid','workflow denied','run identity invalid','verification error')) { Write-Host "WORKERS_OIDC_STAGE=$reason" }
               } catch {}
               $segment = $token.Split('.')[1].Replace('-','+').Replace('_','/')
               $segment += '=' * ((4 - $segment.Length % 4) % 4)
