@@ -1,1 +1,3 @@
 2026-11-27 — one authorized hosted Windows HTTPS relay integration attempt after passing OIDC and regression gates. No cloud place editing.
+
+2026-11-27 — retry pre-login after OIDC request preservation and sanitized failure instrumentation; previous run never submitted credentials.
