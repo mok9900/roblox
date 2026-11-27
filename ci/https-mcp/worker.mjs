@@ -20,9 +20,9 @@ function b64(s) {
 async function jwks(uri,refresh=false) {
   const cached=keys.get(uri);
   if (!refresh && cached && Date.now()<cached.until) return cached.value;
-  const r=await fetch(uri,{redirect:"error",headers:{Accept:"application/json"}});
+  let r;try{r=await fetch(uri,{redirect:"error",headers:{Accept:"application/json"}});}catch{throw Error("key fetch failed");}
   if (!r.ok) throw Error("key service unavailable");
-  const v=await r.json();
+  let v;try{v=await r.json();}catch{throw Error("key decode failed");}
   if (!Array.isArray(v.keys)||v.keys.length>100) throw Error("key set invalid");
   keys.set(uri,{value:v.keys,until:Date.now()+300000});
   return v.keys;
@@ -31,16 +31,16 @@ export async function verifyJwt(token,issuer,audience,keyUri) {
   if (!token || token.length>16384 || typeof audience!=="string" || !audience) throw Error("auth required");
   const parts=token.split(".");
   if(parts.length!==3) throw Error("jwt invalid");
-  const header=JSON.parse(decoder.decode(b64(parts[0])));
-  const payload=JSON.parse(decoder.decode(b64(parts[1])));
+  let header,payload;try{header=JSON.parse(decoder.decode(b64(parts[0])));payload=JSON.parse(decoder.decode(b64(parts[1])));}catch{throw Error("token decode failed");}
   if(header.alg!=="RS256"||typeof header.kid!=="string"||!header.kid||header.crit!==undefined) throw Error("alg invalid");
   let k=(await jwks(keyUri)).find(x=>x.kid===header.kid&&x.kty==="RSA"&&(!x.alg||x.alg==="RS256")&&(!x.use||x.use==="sig"));
   if(!k) {
     k=(await jwks(keyUri,true)).find(x=>x.kid===header.kid&&x.kty==="RSA"&&(!x.alg||x.alg==="RS256")&&(!x.use||x.use==="sig"));
   }
   if(!k) throw Error("key not found");
-  const key=await crypto.subtle.importKey("jwk",k,{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["verify"]);
-  if(!await crypto.subtle.verify("RSASSA-PKCS1-v1_5",key,b64(parts[2]),new TextEncoder().encode(parts[0]+"."+parts[1]))) throw Error("signature invalid");
+  let key;try{key=await crypto.subtle.importKey("jwk",{kty:"RSA",n:k.n,e:k.e,alg:"RS256",ext:true},{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["verify"]);}catch{throw Error("key import failed");}
+  let valid;try{valid=await crypto.subtle.verify("RSASSA-PKCS1-v1_5",key,b64(parts[2]),new TextEncoder().encode(parts[0]+"."+parts[1]));}catch{throw Error("signature verification failed");}
+  if(!valid) throw Error("signature invalid");
   const now=Math.floor(Date.now()/1000);
   const aud=Array.isArray(payload.aud)?payload.aud:[payload.aud];
   if(payload.iss!==issuer||!aud.includes(audience)||!Number.isFinite(payload.exp)||payload.exp<=now||!Number.isFinite(payload.iat)||payload.iat>now+30||(payload.nbf!==undefined&&(!Number.isFinite(payload.nbf)||payload.nbf>now+30))) throw Error("claims invalid");
@@ -126,7 +126,7 @@ export default {
     }
     if(!["/runner/probe","/runner/poll","/runner/result"].includes(u.pathname)||req.method!=="POST")return json({error:"Not found"},404);
     let id;
-    try{id=await runnerAuth(req,u.pathname==="/runner/probe");}catch(e){const reason=["auth required","jwt invalid","alg invalid","key service unavailable","key set invalid","key not found","signature invalid","claims invalid","workflow denied","run identity invalid"].includes(e?.message)?e.message:"verification error";return json({error:"Unauthorized",...(u.pathname==="/runner/probe"?{reason}: {})},401);}
+    try{id=await runnerAuth(req,u.pathname==="/runner/probe");}catch(e){const reason=["auth required","jwt invalid","alg invalid","key service unavailable","key fetch failed","key decode failed","token decode failed","key import failed","signature verification failed","key set invalid","key not found","signature invalid","claims invalid","workflow denied","run identity invalid"].includes(e?.message)?e.message:"verification error";return json({error:"Unauthorized",...(u.pathname==="/runner/probe"?{reason}: {})},401);}
     if(u.pathname==="/runner/probe")return json({authenticated:true,owner_oauth_configured:accessConfigured(env),scope:"github-hosted-readonly-probe"});
     if(!accessConfigured(env))return json({error:"Owner OAuth not configured"},503);
     let body={};
