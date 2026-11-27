@@ -40,6 +40,23 @@ jobs:
             Write-Host "::add-mask::$token"
             $r = Invoke-WebRequest -Uri "$base/runner/probe" -Method Post -Headers @{Authorization=('Bearer ' + $token)} -SkipHttpErrorCheck -MaximumRedirection 0 -TimeoutSec 25
             Write-Host "WORKERS_REAL_OIDC_HTTP_STATUS=$($r.StatusCode)"
+            if ($r.StatusCode -ne 200) {
+              try {
+                $reason = ($r.Content | ConvertFrom-Json).reason
+                if ($reason -in @('auth required','jwt invalid','alg invalid','key service unavailable','key set invalid','key not found','signature invalid','claims invalid','workflow denied','run identity invalid','verification error')) { Write-Host "WORKERS_OIDC_STAGE=$reason" }
+              } catch {}
+              $segment = $token.Split('.')[1].Replace('-','+').Replace('_','/')
+              $segment += '=' * ((4 - $segment.Length % 4) % 4)
+              $claims = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($segment)) | ConvertFrom-Json
+              Write-Host "OIDC_CLAIM_REPOSITORY_MATCH=$($claims.repository -ceq 'mok9900/roblox')"
+              Write-Host "OIDC_CLAIM_REPO_ID_MATCH=$([string]$claims.repository_id -ceq '911533556')"
+              Write-Host "OIDC_CLAIM_WORKFLOW_MATCH=$($claims.workflow_ref -ceq 'mok9900/roblox/.github/workflows/roblox-workers-relay-test.yml@refs/heads/main')"
+              Write-Host "OIDC_CLAIM_REF_MATCH=$($claims.ref -ceq 'refs/heads/main')"
+              Write-Host "OIDC_CLAIM_HOSTED_MATCH=$($claims.runner_environment -ceq 'github-hosted')"
+              Write-Host "OIDC_CLAIM_EVENT_MATCH=$($claims.event_name -in @('push','workflow_dispatch'))"
+              Write-Host "OIDC_CLAIM_AUDIENCE_MATCH=$($claims.aud -contains "$base/runner")"
+              Write-Host "OIDC_CLAIM_ISSUER_MATCH=$($claims.iss -ceq 'https://token.actions.githubusercontent.com')"
+            }
             if ($r.StatusCode -ne 200) { throw 'OIDC rejected' }
             $data = $r.Content | ConvertFrom-Json
             if ($data.authenticated -ne $true -or $data.scope -ne 'github-hosted-readonly-probe') { throw 'Unexpected response' }
