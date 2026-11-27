@@ -1,0 +1,50 @@
+name: Roblox MCP - workers.dev OIDC security probe (no Roblox login)
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/roblox-workers-relay-test.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  probe:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - name: Prove unauthenticated MCP and forged runner credentials are denied
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $base = 'https://roblox-mcp.parcel-mcp-seojun.workers.dev'
+          $body = '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+          $r = Invoke-WebRequest -Uri "$base/mcp" -Method Post -ContentType 'application/json' -Body $body -SkipHttpErrorCheck -MaximumRedirection 0
+          if ($r.StatusCode -notin @(401,403,503)) { throw 'UNAUTHENTICATED_MCP_NOT_DENIED' }
+          Write-Host "WORKERS_MCP_UNAUTHENTICATED_DENIED=$($r.StatusCode)"
+          $r = Invoke-WebRequest -Uri "$base/mcp" -Method Post -ContentType 'application/json' -Body $body -Headers @{'Cf-Access-Jwt-Assertion'='forged.invalid.signature'} -SkipHttpErrorCheck -MaximumRedirection 0
+          if ($r.StatusCode -notin @(401,403,503)) { throw 'FORGED_ACCESS_ASSERTION_NOT_DENIED' }
+          Write-Host "WORKERS_MCP_FORGED_ASSERTION_DENIED=$($r.StatusCode)"
+          $r = Invoke-WebRequest -Uri "$base/runner/probe" -Method Post -Headers @{Authorization='Bearer invalid.invalid.invalid'} -SkipHttpErrorCheck -MaximumRedirection 0
+          if ($r.StatusCode -ne 401) { throw 'FORGED_RUNNER_NOT_DENIED' }
+          Write-Host 'WORKERS_FORGED_RUNNER_DENIED=401'
+      - name: Verify actual GitHub-hosted runner OIDC with free workers.dev endpoint
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $base = 'https://roblox-mcp.parcel-mcp-seojun.workers.dev'
+          try {
+            $uri = $env:ACTIONS_ID_TOKEN_REQUEST_URL + '&audience=' + [Uri]::EscapeDataString("$base/runner")
+            $token = (Invoke-RestMethod -Uri $uri -Headers @{Authorization=('Bearer ' + $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN)} -TimeoutSec 20).value
+            if (-not $token) { throw 'No token' }
+            Write-Host "::add-mask::$token"
+            $r = Invoke-WebRequest -Uri "$base/runner/probe" -Method Post -Headers @{Authorization=('Bearer ' + $token)} -SkipHttpErrorCheck -MaximumRedirection 0 -TimeoutSec 25
+            Write-Host "WORKERS_REAL_OIDC_HTTP_STATUS=$($r.StatusCode)"
+            if ($r.StatusCode -ne 200) { throw 'OIDC rejected' }
+            $data = $r.Content | ConvertFrom-Json
+            if ($data.authenticated -ne $true -or $data.scope -ne 'github-hosted-readonly-probe') { throw 'Unexpected response' }
+            Write-Host 'WORKERS_REAL_GITHUB_HOSTED_OIDC_VERIFIED'
+            Write-Host "WORKERS_OWNER_OAUTH_CONFIGURED=$($data.owner_oauth_configured)"
+          } catch {
+            throw 'WORKERS_OIDC_PROBE_FAILED (details redacted)'
+          }
