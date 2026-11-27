@@ -14,11 +14,10 @@ concurrency:
 jobs:
   isolate-openai-control-plane:
     runs-on: windows-2022
-    timeout-minutes: 8
+    timeout-minutes: 15
     env:
       CONTROL_PLANE_API_KEY: ${{ secrets.OPENAI_TUNNEL_RUNTIME_KEY }}
       CONTROL_PLANE_TUNNEL_ID: ${{ secrets.OPENAI_TUNNEL_ID }}
-      CONTROL_PLANE_POLL_CHANNELS: main
     steps:
       - name: Checkout current proven GitHub-hosted diagnostic source
         uses: actions/checkout@v4
@@ -39,7 +38,7 @@ jobs:
         run: ./ci/assisted/install-tunnel-only.ps1
       - name: Isolate OpenAI control-plane health with self-contained safe MCP fixture
         shell: pwsh
-        timeout-minutes: 5
+        timeout-minutes: 11
         run: |
           if (-not $env:TUNNEL_EXE -or -not (Test-Path -LiteralPath $env:TUNNEL_EXE)) {
             throw 'TUNNEL_ONLY_BINARY_NOT_VERIFIED'
@@ -49,11 +48,11 @@ jobs:
           $out = Join-Path $env:RUNNER_TEMP 'openai-embedded-stub-stdout.tmp'
           $err = Join-Path $env:RUNNER_TEMP 'openai-embedded-stub-stderr.tmp'
           $proc = Start-Process -FilePath $env:TUNNEL_EXE -ArgumentList @(
-            'run','--embedded-stateless-mcp-stub','--control-plane.poll-channel=main'
+            'run','--embedded-stateless-mcp-stub'
           ) -WorkingDirectory $env:GITHUB_WORKSPACE -NoNewWindow -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
           try {
-            Write-Host 'TUNNEL_STUB_ISOLATION_STARTED: official self-contained demo only; not Roblox MCP success.'
-            ./ci/assisted/tunnel-health-probe.ps1 -Samples 12 -IntervalSeconds 10
+            Write-Host 'TUNNEL_STUB_ISOLATION_STARTED: legacy unscoped polling, official stateless demo only; not Roblox MCP success.'
+            ./ci/assisted/tunnel-health-probe.ps1 -Samples 24 -IntervalSeconds 20
             if ($proc.HasExited) {
               throw 'TUNNEL_STUB_ISOLATION_PROCESS_EXITED: inspect sanitized component health; raw logs intentionally not printed.'
             }
