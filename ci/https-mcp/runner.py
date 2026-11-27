@@ -41,10 +41,17 @@ class Runner:
         url = urllib.parse.urlsplit(raw)
         if url.scheme != "https" or not url.hostname or url.username or url.password or url.fragment:
             raise RuntimeError("invalid GitHub OIDC request URL")
-        query = urllib.parse.parse_qsl(url.query, keep_blank_values=True)
-        query = [(k,v) for k,v in query if k != "audience"] + [("audience", AUDIENCE)]
-        target = urllib.parse.urlunsplit((url.scheme,url.netloc,url.path,urllib.parse.urlencode(query),""))
-        result = read_json(urllib.request.Request(target,headers={"Authorization":"Bearer "+os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"],"Accept":"application/json"}))
+        if "audience" in dict(urllib.parse.parse_qsl(url.query,keep_blank_values=True)):
+            raise RuntimeError("unexpected preconfigured audience")
+        target = raw + ("&" if url.query else "?") + "audience=" + urllib.parse.quote(AUDIENCE,safe="")
+        try:
+            result = read_json(urllib.request.Request(target,headers={"Authorization":"Bearer "+os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"],"Accept":"application/json","User-Agent":"roblox-mcp-relay/0.1"}))
+        except urllib.error.HTTPError as exc:
+            print(f"WORKERS_OIDC_ISSUANCE_HTTP={exc.code}",flush=True)
+            raise RuntimeError("OIDC issuance failed") from None
+        except Exception:
+            print("WORKERS_OIDC_ISSUANCE_TRANSPORT_FAILED",flush=True)
+            raise RuntimeError("OIDC issuance failed") from None
         token = result.get("value")
         if not isinstance(token,str) or len(token)>16384 or len(token.split("."))!=3:
             raise RuntimeError("invalid GitHub token")
@@ -56,8 +63,15 @@ class Runner:
         if path not in ("/runner/preflight","/runner/poll","/runner/result"):
             raise ValueError("invalid relay path")
         data = json.dumps(payload or {},separators=(",",":")).encode()
-        req = urllib.request.Request(BASE+path,data=data,method="POST",headers={"Authorization":"Bearer "+self.get_token(),"Content-Type":"application/json","Accept":"application/json"})
-        return read_json(req)
+        req = urllib.request.Request(BASE+path,data=data,method="POST",headers={"Authorization":"Bearer "+self.get_token(),"Content-Type":"application/json","Accept":"application/json","User-Agent":"roblox-mcp-relay/0.1"})
+        try:
+            return read_json(req)
+        except urllib.error.HTTPError as exc:
+            print(f"WORKERS_RELAY_HTTP={exc.code} path={path}",flush=True)
+            raise RuntimeError("relay HTTP failed") from None
+        except Exception:
+            print(f"WORKERS_RELAY_TRANSPORT_FAILED path={path}",flush=True)
+            raise RuntimeError("relay transport failed") from None
 
 def execute_job(job, verify=verify_upstream):
     if not isinstance(job,dict):
