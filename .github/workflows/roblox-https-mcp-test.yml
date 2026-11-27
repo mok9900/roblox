@@ -29,3 +29,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'BRIDGE_REGRESSION_FAILED' }
           python ci/https-mcp/test_runner.py
           if ($LASTEXITCODE -ne 0) { throw 'RUNNER_REGRESSION_FAILED' }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify isolated worker relay lifecycle
+        shell: pwsh
+        run: node --test ci/https-mcp/test_worker.mjs
