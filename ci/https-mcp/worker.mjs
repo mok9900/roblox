@@ -20,7 +20,8 @@ function b64(s) {
 async function jwks(uri,refresh=false) {
   const cached=keys.get(uri);
   if (!refresh && cached && Date.now()<cached.until) return cached.value;
-  let r;try{r=await fetch(uri,{redirect:"error",headers:{Accept:"application/json"}});}catch{throw Error("key fetch failed");}
+  let r;try{r=await fetch(uri,{redirect:"follow",headers:{Accept:"application/json","User-Agent":"roblox-mcp-relay/0.1"},signal:AbortSignal.timeout(10000)});}catch{throw Error("key fetch failed");}
+  if(r.url && new URL(r.url).origin!==new URL(uri).origin)throw Error("key redirect denied");
   if (!r.ok) throw Error("key service unavailable");
   let v;try{v=await r.json();}catch{throw Error("key decode failed");}
   if (!Array.isArray(v.keys)||v.keys.length>100) throw Error("key set invalid");
@@ -126,7 +127,7 @@ export default {
     }
     if(!["/runner/probe","/runner/poll","/runner/result"].includes(u.pathname)||req.method!=="POST")return json({error:"Not found"},404);
     let id;
-    try{id=await runnerAuth(req,u.pathname==="/runner/probe");}catch(e){const reason=["auth required","jwt invalid","alg invalid","key service unavailable","key fetch failed","key decode failed","token decode failed","key import failed","signature verification failed","key set invalid","key not found","signature invalid","claims invalid","workflow denied","run identity invalid"].includes(e?.message)?e.message:"verification error";return json({error:"Unauthorized",...(u.pathname==="/runner/probe"?{reason}: {})},401);}
+    try{id=await runnerAuth(req,u.pathname==="/runner/probe");}catch(e){const reason=["auth required","jwt invalid","alg invalid","key service unavailable","key fetch failed","key redirect denied","key decode failed","token decode failed","key import failed","signature verification failed","key set invalid","key not found","signature invalid","claims invalid","workflow denied","run identity invalid"].includes(e?.message)?e.message:"verification error";return json({error:"Unauthorized",...(u.pathname==="/runner/probe"?{reason}: {})},401);}
     if(u.pathname==="/runner/probe")return json({authenticated:true,owner_oauth_configured:accessConfigured(env),scope:"github-hosted-readonly-probe"});
     if(!accessConfigured(env))return json({error:"Owner OAuth not configured"},503);
     let body={};
