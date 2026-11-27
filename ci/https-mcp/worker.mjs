@@ -126,7 +126,7 @@ export default {
     }
     if(!["/runner/probe","/runner/poll","/runner/result"].includes(u.pathname)||req.method!=="POST")return json({error:"Not found"},404);
     let id;
-    try{id=await runnerAuth(req,u.pathname==="/runner/probe");}catch{return json({error:"Unauthorized"},401);}
+    try{id=await runnerAuth(req,u.pathname==="/runner/probe");}catch(e){const reason=["auth required","jwt invalid","alg invalid","key service unavailable","key set invalid","key not found","signature invalid","claims invalid","workflow denied","run identity invalid"].includes(e?.message)?e.message:"verification error";return json({error:"Unauthorized",...(u.pathname==="/runner/probe"?{reason}: {})},401);}
     if(u.pathname==="/runner/probe")return json({authenticated:true,owner_oauth_configured:accessConfigured(env),scope:"github-hosted-readonly-probe"});
     if(!accessConfigured(env))return json({error:"Owner OAuth not configured"},503);
     let body={};
