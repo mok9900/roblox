@@ -49,7 +49,7 @@ export async function verifyJwt(token,issuer,audience,keyUri) {
 }
 export function runnerIdentity(p,probe=false) {
   const workflow=probe?PROBE:LIVE;
-  if(p.repository!==REPO||String(p.repository_id)!==REPO_ID||p.ref!=="refs/heads/main"||p.runner_environment!=="github-hosted"||p.workflow_ref!==workflow||(!probe&&p.event_name!=="workflow_dispatch")||!["push","workflow_dispatch"].includes(p.event_name)) throw Error("workflow denied");
+  if(p.repository!==REPO||String(p.repository_id)!==REPO_ID||p.ref!=="refs/heads/main"||p.runner_environment!=="github-hosted"||p.workflow_ref!==workflow||!["push","workflow_dispatch"].includes(p.event_name)) throw Error("workflow denied");
   if(!/^\d+$/.test(String(p.run_id))||!/^\d+$/.test(String(p.run_attempt))) throw Error("run identity invalid");
   return String(p.run_id)+":"+String(p.run_attempt);
 }
@@ -125,10 +125,10 @@ export default {
       if(req.method!=="POST")return json({error:"Method not allowed"},405);
       return rpc(req,env);
     }
-    if(!["/runner/probe","/runner/poll","/runner/result"].includes(u.pathname)||req.method!=="POST")return json({error:"Not found"},404);
+    if(!["/runner/probe","/runner/preflight","/runner/poll","/runner/result"].includes(u.pathname)||req.method!=="POST")return json({error:"Not found"},404);
     let id;
     try{id=await runnerAuth(req,u.pathname==="/runner/probe");}catch(e){const reason=["auth required","jwt invalid","alg invalid","key service unavailable","key fetch failed","key redirect denied","key decode failed","token decode failed","key import failed","signature verification failed","key set invalid","key not found","signature invalid","claims invalid","workflow denied","run identity invalid"].includes(e?.message)?e.message:"verification error";return json({error:"Unauthorized",...(u.pathname==="/runner/probe"?{reason}: {})},401);}
-    if(u.pathname==="/runner/probe")return json({authenticated:true,owner_oauth_configured:accessConfigured(env),scope:"github-hosted-readonly-probe"});
+    if(u.pathname==="/runner/probe"||u.pathname==="/runner/preflight")return json({authenticated:true,owner_oauth_configured:accessConfigured(env),scope:u.pathname==="/runner/probe"?"github-hosted-readonly-probe":"github-hosted-readonly-live"});
     if(!accessConfigured(env))return json({error:"Owner OAuth not configured"},503);
     let body={};
     if(u.pathname.endsWith("/result")){try{body=await readBody(req);}catch{return json({error:"Invalid result"},400);}}
