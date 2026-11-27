@@ -145,6 +145,44 @@ def select_challenge_host(edge, studio, mode):
     return None, None
 
 
+def verified_edge_origin(window):
+    """Verify the official HTTPS origin even when the challenge changes tab title."""
+    from urllib.parse import urlsplit
+    found = set()
+    for c in window.descendants(control_type="Edit"):
+        try:
+            n = label(c)
+            if not c.is_visible() or not any(t in n for t in ("address and search", "address bar", "주소 및 검색", "주소 표시줄")):
+                continue
+            u = urlsplit(str(c.get_value()).strip())
+            if u.scheme == "https" and u.hostname in {"roblox.com", "www.roblox.com", "auth.roblox.com"} and not u.username and not u.password and u.port in (None, 443):
+                found.add(u.hostname)
+        except Exception:
+            continue
+    return len(found) == 1
+
+
+def distinct_visible_edits(cs):
+    """Collapse accessibility wrappers for the same physical input only."""
+    by_rect = {}
+    for c in cs:
+        if ctype(c) != "Edit":
+            continue
+        try:
+            if not c.is_visible():
+                continue
+            r = c.rectangle()
+            if r.width() <= 0 or r.height() <= 0:
+                continue
+            key = (r.left, r.top, r.right, r.bottom)
+            previous = by_rect.get(key)
+            if previous is None or (CODE.search(label(c)) and not CODE.search(label(previous))):
+                by_rect[key] = c
+        except Exception:
+            continue
+    return list(by_rect.values())
+
+
 def challenge_controls():
     """Inspect only the official UI that initiated this login session.
 
@@ -163,7 +201,7 @@ def challenge_controls():
             if not window.is_visible():
                 continue
             exe = pmap.get(window.element_info.process_id, "")
-            if exe == "msedge.exe" and "roblox" in (window.window_text() or "").lower():
+            if exe == "msedge.exe" and verified_edge_origin(window):
                 edge.append(window)
             if exe == "robloxstudiobeta.exe":
                 studio.append(window)
@@ -337,7 +375,10 @@ def await_studio(deadline):
 
 
 def find_code_edit(cs):
-    edits = [c for c in cs if ctype(c) == "Edit"]
+    # Do not confuse any independent CAPTCHA or security challenge with email OTP.
+    if any(re.search(r"captcha|arkose|보안 문자", label(c), re.I) for c in cs):
+        return []
+    edits = distinct_visible_edits(cs)
     candidates = [c for c in edits if CODE.search(label(c))]
     if len(candidates) == 1:
         return [candidates[0]]
@@ -761,13 +802,24 @@ if not email_selected:
 
 # Email method selected or code form already present. Never assume a click
 # succeeded in delivering mail; the official code input must actually exist.
-code_deadline = time.monotonic() + 35
+code_deadline = time.monotonic() + 75
+next_diag = 0
 while time.monotonic() < code_deadline:
     if success(studio_only_controls()):
         print("STUDIO_LOGIN_COMPLETED_WHILE_WAITING_FOR_CODE_FORM", flush=True)
         sys.exit(0)
-    if find_code_edit(challenge_controls()):
+    page = challenge_controls()
+    if find_code_edit(page):
         break
+    if time.monotonic() >= next_diag:
+        # Boolean/count-only diagnostics, never any code, email or raw page text.
+        edits = distinct_visible_edits(page)
+        print("EMAIL_FORM_WAIT: controls=%d distinct_edits=%d code_labels=%d verify_buttons=%d" % (
+            len(page), len(edits), sum(bool(CODE.search(label(c))) for c in edits),
+            sum(ctype(c) == "Button" and bool(VERIFY.fullmatch(label(c))) for c in page)
+        ), flush=True)
+        safe_choice_diagnostics()
+        next_diag = time.monotonic() + 20
     time.sleep(2)
 else:
     raise SystemExit("EMAIL_CODE_FORM_NOT_PRESENT_AFTER_OFFICIAL_CHALLENGE")
