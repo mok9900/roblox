@@ -1,0 +1,123 @@
+name: Roblox Studio MCP - private HTTPS relay (hosted Windows)
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ci/https-mcp/live-trigger.txt
+  workflow_dispatch:
+    inputs:
+      windows_runner:
+        description: "Official GitHub-hosted Windows image"
+        type: choice
+        required: true
+        default: windows-2022
+        options:
+          - windows-2022
+          - windows-2025
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: roblox-studio-openai-tunnel-single-instance
+  cancel-in-progress: false
+
+jobs:
+  github-hosted-roblox-mcp:
+    name: Ephemeral Windows Roblox Studio → Cloudflare HTTPS relay
+    # No local/self-hosted runner or persistent Windows machine.
+    runs-on: ${{ inputs.windows_runner || 'windows-2022' }}
+    timeout-minutes: 330
+    env:
+      ROBLOX_USERNAME: ${{ secrets.ROBLOX_USERNAME }}
+      ROBLOX_PASSWORD: ${{ secrets.ROBLOX_PASSWORD }}
+      CONTROL_PLANE_API_KEY: ${{ secrets.OPENAI_TUNNEL_RUNTIME_KEY }}
+      CONTROL_PLANE_TUNNEL_ID: ${{ secrets.OPENAI_TUNNEL_ID }}
+    steps:
+      - name: Checkout currently tested Studio automation branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/studio-openai-tunnel-assisted
+          persist-credentials: false
+      - name: Checkout reviewed HTTPS relay source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: _relay
+          persist-credentials: false
+      - name: Copy relay source and verify OIDC before authentication
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force ci/https-mcp | Out-Null
+          Copy-Item _relay/ci/https-mcp/*.py ci/https-mcp/
+          python ci/https-mcp/runner.py --preflight
+          if ($LASTEXITCODE -ne 0) { throw 'WORKERS_PREFLIGHT_FAILED' }
+      - name: Fail before Roblox login if required secrets are missing
+        shell: pwsh
+        env:
+          GMAIL_OAUTH_CLIENT_ID: ${{ secrets.GMAIL_OAUTH_CLIENT_ID }}
+          GMAIL_OAUTH_CLIENT_SECRET: ${{ secrets.GMAIL_OAUTH_CLIENT_SECRET }}
+          GMAIL_OAUTH_REFRESH_TOKEN: ${{ secrets.GMAIL_OAUTH_REFRESH_TOKEN }}
+        run: |
+          if (-not $env:ROBLOX_USERNAME -or -not $env:ROBLOX_PASSWORD) {
+            throw 'ROBLOX_LOGIN_SECRETS_MISSING'
+          }
+          if (-not $env:CONTROL_PLANE_API_KEY -or -not $env:CONTROL_PLANE_TUNNEL_ID) {
+            throw 'OPENAI_TUNNEL_SECRETS_MISSING'
+          }
+          if (-not $env:GMAIL_OAUTH_CLIENT_ID -or -not $env:GMAIL_OAUTH_CLIENT_SECRET -or -not $env:GMAIL_OAUTH_REFRESH_TOKEN) {
+            throw 'GMAIL_OAUTH_READONLY_SECRETS_MISSING: configure three GitHub Actions secrets before unattended login.'
+          }
+          Write-Host 'GITHUB_HOSTED_SECRETS_PRESENT; all values redacted.'
+      - name: Verify Gmail OAuth read-only access before triggering new Roblox security checks
+        shell: pwsh
+        env:
+          GMAIL_OAUTH_CLIENT_ID: ${{ secrets.GMAIL_OAUTH_CLIENT_ID }}
+          GMAIL_OAUTH_CLIENT_SECRET: ${{ secrets.GMAIL_OAUTH_CLIENT_SECRET }}
+          GMAIL_OAUTH_REFRESH_TOKEN: ${{ secrets.GMAIL_OAUTH_REFRESH_TOKEN }}
+        run: |
+          @'
+          import sys
+          sys.path.insert(0, "ci/assisted")
+          from gmail_otp import _access_token, _json_request, MAIL_URL
+          token = _access_token()
+          _json_request(MAIL_URL + "?maxResults=1", token=token)
+          print("GMAIL_READONLY_PREFLIGHT_SUCCEEDED: fresh token and mailbox scope verified; no message printed.")
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw 'GMAIL_READONLY_PREFLIGHT_FAILED' }
+      - name: Expand GitHub-hosted Windows display for full Roblox Assistant mezzanine
+        shell: pwsh
+        run: ./ci/assisted/configure-hosted-display.ps1
+      - name: Set narrow official Roblox Studio browser callback policy
+        shell: pwsh
+        run: ./ci/assisted/configure-edge.ps1
+      - name: Install official Roblox Studio and checksum-verified OpenAI tunnel-client
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./ci/assisted/install-windows.ps1
+      - name: Install cryptography dependency for legacy helper imports
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --quiet 'cryptography>=44,<48'
+          if ($LASTEXITCODE -ne 0) { throw 'CRYPTOGRAPHY_IMPORT_UNAVAILABLE' }
+      - name: Verify Roblox email 2FA, local Baseplate, official Assistant MCP and tunnel doctor
+        shell: pwsh
+        timeout-minutes: 32
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GMAIL_OAUTH_CLIENT_ID: ${{ secrets.GMAIL_OAUTH_CLIENT_ID }}
+          GMAIL_OAUTH_CLIENT_SECRET: ${{ secrets.GMAIL_OAUTH_CLIENT_SECRET }}
+          GMAIL_OAUTH_REFRESH_TOKEN: ${{ secrets.GMAIL_OAUTH_REFRESH_TOKEN }}
+          ROBLOX_MCP_SETUP_ONLY: '1'
+        run: ./ci/assisted/session.ps1
+      - name: Verify live official Studio and serve owner-authorized read-only requests
+        shell: pwsh
+        env:
+          ROBLOX_USERNAME: ''
+          ROBLOX_PASSWORD: ''
+          CONTROL_PLANE_API_KEY: ''
+          CONTROL_PLANE_TUNNEL_ID: ''
+        run: |
+          python ci/https-mcp/runner.py --duration 15000
+          if ($LASTEXITCODE -ne 0) { throw 'WORKERS_RELAY_FAILED' }
