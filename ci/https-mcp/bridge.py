@@ -100,7 +100,49 @@ def local_fixture_count(value):
         return sum(local_fixture_count(value[k]) for k in ("studios","instances","content","structuredContent","text","result") if k in value)
     return 0
 
-def verify_upstream(argv=None):
+def proof_shape(value):
+    """Fixed-key aggregate diagnostics only; no names, paths, IDs or raw text."""
+    stats = {"objects":0,"arrays":0,"empty_arrays":0,"json_text":0,"other_text":0,
+             "studio_records":0,"local_records":0,"cloud_records":0,
+             "missing_local_flag":0,"exact_name":0,"exact_file":0}
+    keys = set()
+    allowed = {"studios","instances","studioInstances","content","structuredContent","text","result","data",
+               "id","name","file","filePath","mode","state","persistedToCloud","placeId","universeId"}
+    def walk(v,depth=0):
+        if depth>12: return
+        if isinstance(v,str):
+            try: decoded=json.loads(v)
+            except (ValueError,RecursionError):
+                stats["other_text"]+=1
+                return
+            if isinstance(decoded,(dict,list)):
+                stats["json_text"]+=1
+                walk(decoded,depth+1)
+            else: stats["other_text"]+=1
+        elif isinstance(v,list):
+            stats["arrays"]+=1
+            stats["empty_arrays"]+=int(not v)
+            for item in v[:100]: walk(item,depth+1)
+        elif isinstance(v,dict):
+            stats["objects"]+=1
+            keys.update(set(v)&allowed)
+            if any(k in v for k in ("id","name","file","filePath","persistedToCloud")):
+                stats["studio_records"]+=1
+                flag=v.get("persistedToCloud")
+                stats["local_records"]+=int(flag is False)
+                stats["cloud_records"]+=int(flag is True)
+                stats["missing_local_flag"]+=int(type(flag) is not bool)
+                name=v.get("name")
+                file=v.get("file")
+                stats["exact_name"]+=int(isinstance(name,str) and name.casefold() in {FIXTURE,FIXTURE+".rbxl",FIXTURE+".rbxlx"})
+                stats["exact_file"]+=int(isinstance(file,str) and file.replace(chr(92),"/").split("/")[-1].casefold() in {FIXTURE+".rbxl",FIXTURE+".rbxlx"})
+            for key in allowed & set(v):
+                if key in ("studios","instances","studioInstances","content","structuredContent","text","result","data"):
+                    walk(v[key],depth+1)
+    walk(value)
+    return {**stats,"known_keys":sorted(keys)}
+
+def verify_upstream(argv=None, startup_wait=0):
     live = argv is None
     def marker(stage):
         # Fixed stage labels only: never log raw tool outputs, paths or tokens.
@@ -135,18 +177,24 @@ def verify_upstream(argv=None):
             raise RuntimeError("official tool missing")
         marker("catalog_verified")
         phase = "list_studios"
-        result = child.send("tools/call", {"name":"list_roblox_studios","arguments":{}})
-        if not isinstance(result,dict) or result.get("isError"):
-            raise RuntimeError("upstream tool failed")
-        marker("list_studios_returned")
-        phase = "fixture"
-        # MCP structuredContent and content can represent the same result.
-        # Count only one representation. Never fall back from a conflicting
-        # structured result to human-readable text.
-        proof = result["structuredContent"] if "structuredContent" in result else result
-        count = local_fixture_count(proof)
-        marker("fixture_verified" if count == 1 else "fixture_not_verified")
-        return {"verified": count == 1, "matching_local_fixtures":count, "source":"official_studio_mcp"}
+        # Keep the same official child alive during bounded startup discovery.
+        # This permits Studio's local connection to register asynchronously.
+        deadline = time.monotonic() + min(60,max(0,startup_wait))
+        while True:
+            phase = "list_studios"
+            result = child.send("tools/call", {"name":"list_roblox_studios","arguments":{}})
+            if not isinstance(result,dict) or result.get("isError"):
+                raise RuntimeError("upstream tool failed")
+            marker("list_studios_returned")
+            phase = "fixture"
+            proof = result["structuredContent"] if "structuredContent" in result else result
+            count = local_fixture_count(proof)
+            if live:
+                print("OFFICIAL_STUDIO_PROOF_SHAPE="+json.dumps(proof_shape(proof),sort_keys=True),flush=True)
+            marker("fixture_verified" if count == 1 else "fixture_not_verified")
+            if count != 0 or time.monotonic() >= deadline:
+                return {"verified": count == 1, "matching_local_fixtures":count, "source":"official_studio_mcp"}
+            time.sleep(min(5,max(0,deadline-time.monotonic())))
     except Exception as exc:
         marker(phase + ("_timeout" if isinstance(exc,(queue.Empty, TimeoutError)) else "_failed"))
         raise
