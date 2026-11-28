@@ -629,23 +629,48 @@ def visual_email_choice():
 
 
 def find_email_send_confirmation(cs):
-    """Only a distinct, explicit email-code delivery action, never generic Next."""
-    if distinct_visible_edits(cs):
-        return None
+    """Unique official email delivery action; never fill or change a destination."""
     if any(re.search(r"captcha|arkose|authenticator|backup code|security key|보안 문자|인증 앱|백업 코드|보안 키", label(c), re.I) for c in cs):
         return None
     explicit = re.compile(
         r"^(?:send (?:a |the )?(?:verification |security )?code (?:to (?:my |your )?email|via email|by email)|"
         r"email (?:me )?(?:a |the )?(?:verification )?code|send (?:me )?an email code|"
         r"이메일로 (?:인증 )?코드 (?:보내기|전송)|이메일 (?:인증 )?코드 (?:보내기|전송))$", re.I)
+    edits = distinct_visible_edits(cs)
+    if len(edits)>1:
+        return None
+    # Browser variant observed: one destination input and a literal Send code.
+    # Require independent email evidence and an existing address. Never enter
+    # a new address, read a password field, or treat an OTP as a destination.
+    destination_ok = False
+    if edits:
+        field = edits[0]
+        name = label(field)
+        if re.search(r"password|username|user name|phone|sms|code|비밀번호|사용자|전화|코드",name,re.I):
+            return None
+        email_context = bool(re.search(r"e-?mail|이메일",name,re.I)) or any(
+            ctype(c) == "Text" and re.search(r"(?:send|sent|delivery|receive).{0,80}(?:e-?mail)|(?:e-?mail).{0,80}(?:code|address)|이메일",label(c),re.I)
+            for c in cs)
+        if not email_context:
+            return None
+        try:
+            # Validate only shape in memory; never emit a destination value.
+            v = str(field.get_value() or "").strip()
+            destination_ok = bool(re.fullmatch(r"[^\s@]{1,100}@[a-z0-9*•·.-]{1,100}\.[a-z*•·]{2,24}",v,re.I))
+        except Exception:
+            return None
+        if not destination_ok:
+            return None
     matches = []
     for c in cs:
         try:
-            if ctype(c) in ("Button", "Hyperlink") and explicit.fullmatch(label(c)) and c.is_visible() and c.is_enabled():
+            name = label(c)
+            accepted = bool(explicit.fullmatch(name)) or (destination_ok and bool(re.fullmatch(r"send code|코드 보내기|코드 전송",name,re.I)))
+            if ctype(c) in ("Button","Hyperlink") and accepted and c.is_visible() and c.is_enabled():
                 matches.append(c)
         except Exception:
             continue
-    return matches[0] if len(matches) == 1 else None
+    return matches[0] if len(matches)==1 else None
 
 
 def choose_email():
