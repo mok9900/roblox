@@ -447,7 +447,7 @@ def safe_choice_diagnostics():
         r"verify with email|verify through email|use email|"
         r"authenticator app|approve on another device|"
         r"backup code|recovery code|two.step verification|"
-        r"verify|continue|cancel|back|other|"
+        r"verify|confirm|continue|submit|next|send code|send code by email|send code via email|send code to email|cancel|back|other|"
         r"다른 방법|다른 인증 수단|다른 방법으로 인증|이메일|"
         r"이메일로 코드 보내기|이메일 인증|인증 앱|백업 코드|"
         r"계속|확인|취소)$", re.I
@@ -628,6 +628,26 @@ def visual_email_choice():
         return False
 
 
+def find_email_send_confirmation(cs):
+    """Only a distinct, explicit email-code delivery action, never generic Next."""
+    if distinct_visible_edits(cs):
+        return None
+    if any(re.search(r"captcha|arkose|authenticator|backup code|security key|보안 문자|인증 앱|백업 코드|보안 키", label(c), re.I) for c in cs):
+        return None
+    explicit = re.compile(
+        r"^(?:send (?:a |the )?(?:verification |security )?code (?:to (?:my |your )?email|via email|by email)|"
+        r"email (?:me )?(?:a |the )?(?:verification )?code|send (?:me )?an email code|"
+        r"이메일로 (?:인증 )?코드 (?:보내기|전송)|이메일 (?:인증 )?코드 (?:보내기|전송))$", re.I)
+    matches = []
+    for c in cs:
+        try:
+            if ctype(c) in ("Button", "Hyperlink") and explicit.fullmatch(label(c)) and c.is_visible() and c.is_enabled():
+                matches.append(c)
+        except Exception:
+            continue
+    return matches[0] if len(matches) == 1 else None
+
+
 def choose_email():
     """Use official Roblox email 2FA choice, never Edge's toolbar menu."""
     alternatives_opened = False
@@ -804,6 +824,7 @@ if not email_selected:
 # succeeded in delivering mail; the official code input must actually exist.
 code_deadline = time.monotonic() + 75
 next_diag = 0
+email_confirmation_attempted = False
 while time.monotonic() < code_deadline:
     if success(studio_only_controls()):
         print("STUDIO_LOGIN_COMPLETED_WHILE_WAITING_FOR_CODE_FORM", flush=True)
@@ -811,6 +832,19 @@ while time.monotonic() < code_deadline:
     page = challenge_controls()
     if find_code_edit(page):
         break
+    if not email_confirmation_attempted:
+        confirmation = find_email_send_confirmation(page)
+        if confirmation is not None:
+            # At most one distinct delivery confirmation; never retry or
+            # select a generic button, alternate method or separate challenge.
+            email_confirmation_attempted = True
+            try:
+                confirmation.click_input()
+                print("EMAIL_EXPLICIT_DELIVERY_CONFIRMATION_CLICKED", flush=True)
+            except Exception:
+                print("EMAIL_EXPLICIT_DELIVERY_CONFIRMATION_UNAVAILABLE", flush=True)
+            time.sleep(2)
+            continue
     if time.monotonic() >= next_diag:
         # Boolean/count-only diagnostics, never any code, email or raw page text.
         edits = distinct_visible_edits(page)
