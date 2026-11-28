@@ -32,6 +32,16 @@ class BridgeTests(unittest.TestCase):
         self.assertTrue(result["verified"])
         self.assertEqual(result["matching_local_fixtures"],1)
 
+    def test_dual_result_counted_once(self):
+        result = bridge.verify_upstream([sys.executable,"-u",str(Path(__file__).resolve().with_name("fixture.py")),"--dual"])
+        self.assertTrue(result["verified"])
+        self.assertEqual(result["matching_local_fixtures"],1)
+
+    def test_conflicting_structured_result_not_verified(self):
+        result = bridge.verify_upstream([sys.executable,"-u",str(Path(__file__).resolve().with_name("fixture.py")),"--conflicting"])
+        self.assertFalse(result["verified"])
+        self.assertEqual(result["matching_local_fixtures"],0)
+
     def test_secret_environment_not_inherited(self):
         with patch.dict(os.environ,{"ROBLOX_PASSWORD":"synthetic","CF_ACCESS_ALLOWED_EMAIL":"synthetic","OPENAI_TUNNEL_RUNTIME_KEY":"synthetic","CLOUDFLARE_TUNNEL_TOKEN":"synthetic","GMAIL_OAUTH_REFRESH_TOKEN":"synthetic"}):
             env = bridge.safe_env()
