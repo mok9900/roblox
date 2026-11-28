@@ -13,7 +13,7 @@ concurrency:
 jobs:
   launch:
     if: >-
-      github.repository == 'mok9900/roblox' && github.event.head_commit.message == 'ci: start one bounded RS v2 integration smoke'
+      github.repository == 'mok9900/roblox' && github.event.head_commit.message == 'ci: retry bounded RS v2 smoke after verified browser focus fix'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
