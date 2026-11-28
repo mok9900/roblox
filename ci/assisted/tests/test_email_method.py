@@ -10,7 +10,7 @@ import unittest
 SOURCE = pathlib.Path(__file__).resolve().parents[1] / "login-ui.py"
 tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
 selectors = [n for n in tree.body if isinstance(n, ast.FunctionDef)
-             and n.name in ("find_email_method", "select_challenge_host", "safe_choice_diagnostics", "in_browser_content", "find_code_edit", "distinct_visible_edits", "verified_edge_origin", "find_browser_handoff", "find_protocol_consent")]
+             and n.name in ("find_email_method", "select_challenge_host", "safe_choice_diagnostics", "in_browser_content", "find_code_edit", "distinct_visible_edits", "verified_edge_origin", "find_email_send_confirmation", "find_browser_handoff", "find_protocol_consent")]
 
 
 class Control:
@@ -27,6 +27,9 @@ class Control:
 
     def is_visible(self):
         return self.visible
+
+    def is_enabled(self):
+        return True
 
     def rectangle(self):
         return Rect(*self.bounds)
@@ -279,6 +282,23 @@ class ChallengeFieldSafetyTest(unittest.TestCase):
         self.assertFalse(verify(window("https://www.roblox.com.example.invalid/login")))
         self.assertFalse(verify(window("http://www.roblox.com/login")))
         self.assertFalse(verify(window("https://www.roblox.com@evil.invalid/login")))
+
+
+class EmailDeliveryConfirmationTests(unittest.TestCase):
+    def test_explicit_delivery(self):
+        c = Control("Button", "Send verification code via email")
+        self.assertIs(scope["find_email_send_confirmation"]([c]), c)
+
+    def test_generic_next_never_clicked(self):
+        self.assertIsNone(scope["find_email_send_confirmation"]([Control("Button", "Next")]))
+
+    def test_multiple_confirmations_rejected(self):
+        self.assertIsNone(scope["find_email_send_confirmation"]([Control("Button", "Email me a code"), Control("Button", "Send code via email")]))
+
+    def test_existing_input_and_independent_challenges_rejected(self):
+        c = Control("Button", "Send code via email")
+        for extra in (Control("Edit", "Verification code"), Control("Text", "CAPTCHA"), Control("Text", "Authenticator"), Control("Text", "Security key")):
+            self.assertIsNone(scope["find_email_send_confirmation"]([c,extra]))
 
 
 class BrowserHandoffSafetyTest(unittest.TestCase):
