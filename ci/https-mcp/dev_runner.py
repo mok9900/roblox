@@ -12,7 +12,7 @@ import uuid
 from runner import Runner, OPENER, hosted_only
 from studio_session import StudioSession
 
-WORKFLOW="https://api.github.com/repos/mok9900/roblox/actions/workflows/roblox-workers-relay-live.yml/dispatches"
+WORKFLOW="https://api.github.com/repos/mok9900/roblox/actions/workflows/roblox-workers-relay-dev.yml/dispatches"
 OVERLAP_MS=1800000
 RUN_MS=15000000
 MAX_HOP=7
