@@ -106,7 +106,7 @@ def main():
     print("WORKERS_LIVE_PREFLIGHT_VERIFIED",flush=True)
     if args.preflight:
         return
-    proof=verify_upstream()
+    proof=verify_upstream(startup_wait=60)
     if not proof.get("verified") or proof.get("matching_local_fixtures")!=1:
         raise RuntimeError("official Studio local fixture not verified")
     print("WORKERS_LOCAL_OFFICIAL_STUDIO_MCP_VERIFIED",flush=True)
