@@ -142,3 +142,78 @@ test("finite development session expires and cannot accept another session early
   assert.equal(b.catalog().status,503);
   assert.equal(b.poll("100:1",{session_id:sid}).status,410);
 });
+
+import {DurableDevelopmentRelay} from "./development_broker.mjs";
+class MemoryStorage {
+  constructor(initial){this.value=initial===undefined?undefined:structuredClone(initial);this.fail=false;}
+  async get(key){assert.equal(key,"development-state-v1");return this.value===undefined?undefined:structuredClone(this.value);}
+  async put(key,value){assert.equal(key,"development-state-v1");if(this.fail)throw Error("synthetic storage failure");this.value=structuredClone(value);}
+}
+function durableFixture(edits=false){
+  let t=1000;
+  const options={now:()=>t,requestTimeout:50};
+  const reg={session_id:sid,session_end:7201000,deadline:3601000,allow_edits:edits,proof,catalog:edits?[...cat,{name:"multi_edit",inputSchema:{type:"object"}}]:cat};
+  return {options,reg,at:v=>{t=v;}};
+}
+test("actual Relay reconstructs registration from durable storage after eviction",async()=>{
+  const storage=new MemoryStorage(),r=new Relay({storage});
+  const now=Date.now(),reg={session_id:sid,session_end:now+3600000,deadline:now+1800000,allow_edits:false,proof,catalog:cat};
+  assert.equal((await call(r,"/development/register","100:1",reg)).status,200);
+  const fresh=new Relay({storage});
+  assert.equal((await call(fresh,"/development/poll","100:1",{session_id:sid})).status,200);
+  assert.deepEqual(await (await call(fresh,"/development/catalog")).json(),{tools:cat});
+  assert.equal((await call(fresh,"/development/poll","100:1",{session_id:"22345678-1234-4234-9234-123456789012"})).status,410);
+});
+test("durable handoff preserves retired runner fencing after reconstruction",async()=>{
+  const {options,reg,at}=durableFixture(),storage=new MemoryStorage();
+  let r=new DurableDevelopmentRelay(storage,options);
+  assert.equal((await r.call("/development/register","100:1",reg)).status,200);
+  at(1801000);
+  assert.equal((await r.call("/development/poll","100:1",{session_id:sid})).status,200);
+  assert.equal((await r.call("/development/register","200:1",{...reg,deadline:7201000})).status,200);
+  r=new DurableDevelopmentRelay(storage,options);
+  assert.equal((await r.call("/development/poll","100:1",{session_id:sid})).value.role,"retired");
+  assert.equal((await r.call("/development/register","100:1",reg)).status,410);
+  assert.equal((await r.call("/development/poll","200:1",{session_id:sid})).value.role,"active");
+});
+test("interrupted read request is never replayed; stale reply is rejected after restart",async()=>{
+  const {options,reg}=durableFixture(),storage=new MemoryStorage();
+  const old=new DurableDevelopmentRelay(storage,options);
+  await old.call("/development/register","100:1",reg);
+  const pending=old.call("/development/request",null,{name:"get_studio_state",arguments:{studio_id:"private-arg"}});
+  const job=(await old.call("/development/poll","100:1",{session_id:sid})).value;
+  assert.equal(job.action.name,"get_studio_state");
+  assert.equal(storage.value.interrupted.delivered,true);
+  assert.ok(!JSON.stringify(storage.value).includes("private-arg"));
+  // Isolated snapshot simulates a new actor after the previous actor is gone.
+  const restored=new DurableDevelopmentRelay(new MemoryStorage(storage.value),options);
+  assert.equal((await restored.call("/development/poll","100:1",{session_id:sid})).value.request_id,null);
+  assert.equal((await restored.call("/development/result","100:1",{request_id:job.request_id,generation:job.generation,result:{content:[]}})).status,409);
+  assert.equal((await pending).status,504);
+});
+test("interrupted edit is quarantined until the bounded session ends",async()=>{
+  const {options,reg,at}=durableFixture(true),storage=new MemoryStorage();
+  const old=new DurableDevelopmentRelay(storage,options);
+  await old.call("/development/register","100:1",reg);
+  const pending=old.call("/development/request",null,{name:"multi_edit",arguments:{studio_id:"local"}});
+  await old.call("/development/poll","100:1",{session_id:sid});
+  const restarted=new DurableDevelopmentRelay(new MemoryStorage(storage.value),options);
+  assert.equal((await restarted.call("/development/catalog",null)).status,503);
+  assert.equal((await restarted.call("/development/request",null,{name:"multi_edit",arguments:{}})).status,409);
+  assert.equal((await pending).status,504);
+  at(7201000);
+  assert.equal((await restarted.call("/development/catalog",null)).status,503);
+});
+test("storage failure before job delivery fails closed",async()=>{
+  const {options,reg}=durableFixture(),storage=new MemoryStorage();
+  const r=new DurableDevelopmentRelay(storage,options);
+  await r.call("/development/register","100:1",reg);
+  const pending=r.call("/development/request",null,{name:"get_studio_state",arguments:{}});
+  // Wait for durable request admission; then simulate the delivery write failing.
+  await r.tail;
+  storage.fail=true;
+  const failed=await r.call("/development/poll","100:1",{session_id:sid});
+  assert.equal(failed.status,503);
+  assert.equal(storage.value.interrupted.delivered,false);
+  assert.equal((await pending).status,503);
+});
