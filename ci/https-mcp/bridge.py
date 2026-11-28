@@ -101,28 +101,55 @@ def local_fixture_count(value):
     return 0
 
 def verify_upstream(argv=None):
-    if argv is None:
+    live = argv is None
+    def marker(stage):
+        # Fixed stage labels only: never log raw tool outputs, paths or tokens.
+        if live:
+            print("OFFICIAL_STDIO_STAGE=" + stage, flush=True)
+
+    phase = "launcher"
+    if live:
         if os.name != "nt" or os.getenv("GITHUB_ACTIONS") != "true" or os.getenv("RUNNER_OS") != "Windows":
             raise RuntimeError("hosted Windows only")
         launcher = Path(os.environ["LOCALAPPDATA"]) / "Roblox" / "mcp.bat"
         if not launcher.is_file() or not (ROOT / "roblox-mcp-stdio.cmd").is_file():
+            marker("launcher_missing")
             raise RuntimeError("official launcher missing")
         argv = ["cmd.exe","/d","/c","roblox-mcp-stdio.cmd"]
     if not LOCK.acquire(blocking=False):
         raise RuntimeError("bridge busy")
     child = None
     try:
+        phase = "spawn"
         child = Child(argv)
-        child.send("initialize", {"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"roblox-ci-readonly-bridge","version":"0.1.0"}})
+        marker("spawned")
+        phase = "initialize"
+        init = child.send("initialize", {"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"roblox-ci-readonly-bridge","version":"0.1.1"}})
+        if not isinstance(init, dict) or not isinstance(init.get("protocolVersion"), str):
+            raise RuntimeError("invalid initialize result")
         child.send("notifications/initialized", notification=True)
+        marker("initialized")
+        phase = "catalog"
         catalog = child.send("tools/list")
-        if not any(t.get("name") == "list_roblox_studios" for t in catalog.get("tools", []) if isinstance(t,dict)):
+        if not isinstance(catalog,dict) or not isinstance(catalog.get("tools"),list) or not any(t.get("name") == "list_roblox_studios" for t in catalog["tools"] if isinstance(t,dict)):
             raise RuntimeError("official tool missing")
+        marker("catalog_verified")
+        phase = "list_studios"
         result = child.send("tools/call", {"name":"list_roblox_studios","arguments":{}})
         if not isinstance(result,dict) or result.get("isError"):
             raise RuntimeError("upstream tool failed")
-        count = local_fixture_count(result)
+        marker("list_studios_returned")
+        phase = "fixture"
+        # MCP structuredContent and content can represent the same result.
+        # Count only one representation. Never fall back from a conflicting
+        # structured result to human-readable text.
+        proof = result["structuredContent"] if "structuredContent" in result else result
+        count = local_fixture_count(proof)
+        marker("fixture_verified" if count == 1 else "fixture_not_verified")
         return {"verified": count == 1, "matching_local_fixtures":count, "source":"official_studio_mcp"}
+    except Exception as exc:
+        marker(phase + ("_timeout" if isinstance(exc,(queue.Empty, TimeoutError)) else "_failed"))
+        raise
     finally:
         try:
             if child:
