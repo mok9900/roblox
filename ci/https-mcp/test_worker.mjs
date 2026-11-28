@@ -44,3 +44,54 @@ test("authenticated relay routes one request and accepts only matching proof",as
   assert.deepEqual(await (await pending).json(),proof);
   assert.equal((await call(r,"/runner/result",first,{request_id:job.request_id,result:proof})).status,409);
 });
+
+import {HandoffModel} from "./handoff-model.mjs";
+
+function scenario(){
+  let t=0;
+  const m=new HandoffModel({now:()=>t,sessionEnd:7200000});
+  assert.equal(m.admit("100:1",3600000,proof),true);
+  return {m,at:(v)=>{t=v;}};
+}
+test("bounded handoff admits a verified successor only in the overlap window",()=>{
+  const {m,at}=scenario();
+  at(1799999);
+  assert.equal(m.admit("200:1",7200000,proof),false);
+  at(1800000);
+  assert.equal(m.admit("200:1",7200000,{...proof,verified:false,matching_local_fixtures:0}),false);
+  assert.equal(m.admit("200:1",7200000,proof),true);
+  assert.equal(m.admit("300:1",7200000,proof),false);
+  assert.equal(m.heartbeat("100:1"),true);
+  assert.equal(m.begin("r1").runner,"100:1");
+  assert.equal(m.promote(),false);
+  assert.equal(m.finish("200:1","r1",1),false);
+  assert.equal(m.finish("100:1","r1",1),true);
+  assert.equal(m.promote(),true);
+  assert.equal(m.heartbeat("100:1"),false);
+  assert.deepEqual(m.begin("r2"),{requestId:"r2",runner:"200:1",generation:2});
+  assert.equal(m.finish("100:1","r2",1),false);
+  assert.equal(m.finish("200:1","r2",2),true);
+});
+test("stale successor cannot take traffic; old runner remains available",()=>{
+  const {m,at}=scenario();
+  at(1800000);
+  assert.equal(m.admit("200:1",7200000,proof),true);
+  at(1820001);m.heartbeat("100:1");
+  assert.equal(m.promote(),false);
+  assert.equal(m.begin("r").runner,"100:1");
+});
+test("session expiry and ambiguous requests fail closed",()=>{
+  const {m,at}=scenario();
+  at(1800000);m.heartbeat("100:1");
+  assert.equal(m.admit("200:1",7200001,proof),false);
+  assert.equal(m.admit("200:1",7200000,proof),true);
+  const old=m.begin("old");
+  assert.equal(m.promote(),false);
+  assert.equal(m.abandon("old",old.generation),true);
+  assert.equal(m.promote(),true);
+  assert.equal(m.finish("100:1","old",old.generation),false);
+  at(7200000);
+  assert.equal(m.begin("new"),null);
+  assert.equal(m.heartbeat("200:1"),false);
+  assert.equal(m.admit("300:1",7300000,proof),false);
+});
