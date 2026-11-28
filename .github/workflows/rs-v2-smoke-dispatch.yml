@@ -1,0 +1,32 @@
+name: RS v2 one-shot integration smoke
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/rs-v2-smoke-dispatch.yml'
+permissions:
+  actions: write
+  contents: read
+concurrency:
+  group: rs-v2-smoke-dispatch
+  cancel-in-progress: false
+jobs:
+  launch:
+    if: github.repository == 'mok9900/roblox' && github.event.head_commit.message == 'ci: start one bounded RS v2 integration smoke'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Dispatch one read-only one-hour development smoke session
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="repos/mok9900/roblox/actions/workflows/roblox-workers-relay-dev.yml"
+          active="$(gh api "$endpoint/runs?per_page=30" --jq '[.workflow_runs[] | select(.status != "completed")] | length')"
+          if [[ "$active" != "0" ]]; then
+            echo "RS_V2_SMOKE_ALREADY_ACTIVE"
+            exit 0
+          fi
+          printf '%s' '{"ref":"main","inputs":{"windows_runner":"windows-2022","dev_hours":"1","dev_allow_local_edits":"false","dev_session_id":"","dev_session_end":"","dev_hop":"0"}}' | gh api --method POST "$endpoint/dispatches" --input -
+          echo "RS_V2_SMOKE_DISPATCH_ACCEPTED"
