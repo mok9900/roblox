@@ -11,3 +11,5 @@
 2026-11-28 — authenticated setup succeeded in 46105911928; single diagnostic rerun using tested official stdio stage markers and structured proof parser.
 
 2026-11-28 — official list_studios returned; single retry with tested response-shape diagnostics and bounded registration wait.
+
+2026-11-28 — single integration retry after 131 passing tests for guarded prefilled email delivery confirmation.
