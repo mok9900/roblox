@@ -95,3 +95,50 @@ test("session expiry and ambiguous requests fail closed",()=>{
   assert.equal(m.heartbeat("200:1"),false);
   assert.equal(m.admit("300:1",7300000,proof),false);
 });
+
+import {DevelopmentBroker} from "./development_broker.mjs";
+const sid="12345678-1234-4234-9234-123456789012";
+const cat=[{name:"list_roblox_studios",inputSchema:{type:"object"}},{name:"get_studio_state",inputSchema:{type:"object"}}];
+function devScenario(){
+  let t=1000;
+  const b=new DevelopmentBroker({now:()=>t,requestTimeout:1000});
+  const reg={session_id:sid,session_end:7201000,deadline:3601000,allow_edits:false,proof,catalog:cat};
+  assert.equal(b.register("100:1",reg).status,200);
+  return {b,reg,at:v=>{t=v;}};
+}
+test("development broker requires live proof and separately authenticated workflow",()=>{
+  const p={repository:"mok9900/roblox",repository_id:"911533556",ref:"refs/heads/main",runner_environment:"github-hosted",workflow_ref:"mok9900/roblox/.github/workflows/roblox-workers-relay-dev.yml@refs/heads/main",event_name:"workflow_dispatch",run_id:"100",run_attempt:"1"};
+  assert.equal(runnerIdentity(p,false,true),"100:1");
+  assert.throws(()=>runnerIdentity({...p,event_name:"push"},false,true));
+  assert.throws(()=>runnerIdentity(p));
+  const {b,reg,at}=devScenario();
+  at(1801000);
+  assert.equal(b.register("200:1",{...reg,deadline:7201000,proof:{...proof,verified:false}}).status,400);
+  assert.equal(b.register("200:1",{...reg,deadline:7201000,catalog:[...cat,{name:"open_cloud_invoke",inputSchema:{type:"object"}}]}).status,400);
+});
+test("real broker handoff drains old request and fences late results",async()=>{
+  const {b,reg,at}=devScenario();
+  at(1800999);b.poll("100:1",{session_id:sid});
+  assert.equal(b.register("200:1",{...reg,deadline:7201000}).status,409);
+  at(1801000);b.poll("100:1",{session_id:sid});
+  const pending=b.request({name:"get_studio_state",arguments:{studio_id:"old"}});
+  const job=b.poll("100:1",{session_id:sid}).value;
+  assert.equal(job.action.name,"get_studio_state");
+  assert.equal(b.register("200:1",{...reg,deadline:7201000}).status,200);
+  assert.equal(b.poll("200:1",{session_id:sid}).value.role,"standby");
+  const result={request_id:job.request_id,generation:job.generation,result:{content:[{type:"text",text:"ok"}]}};
+  assert.equal(b.result("200:1",result).status,409);
+  assert.equal(b.result("100:1",result).status,200);
+  assert.equal((await pending).status,200);
+  assert.equal(b.poll("100:1",{session_id:sid}).value.role,"retired");
+  assert.equal(b.poll("200:1",{session_id:sid}).value.role,"active");
+  assert.equal(b.result("100:1",result).status,409);
+  assert.equal(b.request({name:"execute_luau",arguments:{}}).status,403);
+});
+test("finite development session expires and cannot accept another session early",()=>{
+  const {b,reg,at}=devScenario();
+  assert.equal(b.register("200:1",{...reg,session_id:"22345678-1234-4234-9234-123456789012"}).status,409);
+  at(7201000);
+  assert.equal(b.catalog().status,503);
+  assert.equal(b.poll("100:1",{session_id:sid}).status,410);
+});
