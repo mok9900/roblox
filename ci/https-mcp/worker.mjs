@@ -8,6 +8,7 @@ const REPO = "mok9900/roblox";
 const REPO_ID = "911533556";
 const PROBE = REPO + "/.github/workflows/roblox-workers-relay-test.yml@refs/heads/main";
 const LIVE = REPO + "/.github/workflows/roblox-workers-relay-live.yml@refs/heads/main";
+const DEV = REPO + "/.github/workflows/roblox-workers-relay-dev.yml@refs/heads/main";
 const TOOL = {name:"verify_ci_studio",description:"Read-only live proof of the official Studio MCP on the GitHub-hosted Windows runner; does not edit or publish.",inputSchema:{type:"object",properties:{},additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}};
 const keys = new Map();
 const decoder = new TextDecoder("utf-8",{fatal:true});
@@ -48,8 +49,9 @@ export async function verifyJwt(token,issuer,audience,keyUri) {
   if(payload.iss!==issuer||!aud.includes(audience)||!Number.isFinite(payload.exp)||payload.exp<=now||!Number.isFinite(payload.iat)||payload.iat>now+30||(payload.nbf!==undefined&&(!Number.isFinite(payload.nbf)||payload.nbf>now+30))) throw Error("claims invalid");
   return payload;
 }
-export function runnerIdentity(p,probe=false) {
-  const workflow=probe?PROBE:LIVE;
+export function runnerIdentity(p,probe=false,development=false) {
+  const workflow=development?DEV:probe?PROBE:LIVE;
+  if(development&&p.event_name!=="workflow_dispatch")throw Error("workflow denied");
   if(p.repository!==REPO||String(p.repository_id)!==REPO_ID||p.ref!=="refs/heads/main"||p.runner_environment!=="github-hosted"||p.workflow_ref!==workflow||!["push","workflow_dispatch"].includes(p.event_name)) throw Error("workflow denied");
   if(!/^\d+$/.test(String(p.run_id))||!/^\d+$/.test(String(p.run_attempt))) throw Error("run identity invalid");
   return String(p.run_id)+":"+String(p.run_attempt);
@@ -59,7 +61,7 @@ async function runnerAuth(req,probe,development=false) {
   if(!auth.startsWith("Bearer ")) throw Error("auth required");
   const p=await verifyJwt(auth.slice(7),GH_ISSUER,GH_AUD,GH_ISSUER+"/.well-known/jwks");
   if(development&&p.event_name!=="workflow_dispatch")throw Error("workflow denied");
-  return runnerIdentity(p,probe);
+  return runnerIdentity(p,probe,development);
 }
 function accessConfigured(env) {
   return /^https:\/\/[a-z0-9-]+\.cloudflareaccess\.com$/.test(env.CF_ACCESS_ISSUER||"")&&!!env.CF_ACCESS_AUD&&!!env.CF_ACCESS_ALLOWED_EMAIL;
@@ -156,11 +158,11 @@ export default {
       if(req.method!=="POST")return json({error:"Method not allowed"},405);
       return rpc(req,env);
     }
-    const development=["/development/register","/development/poll","/development/result"].includes(u.pathname);
+    const development=["/development/preflight","/development/register","/development/poll","/development/result"].includes(u.pathname);
     if((!development&&!["/runner/probe","/runner/preflight","/runner/poll","/runner/result"].includes(u.pathname))||req.method!=="POST")return json({error:"Not found"},404);
     let id;
     try{id=await runnerAuth(req,u.pathname==="/runner/probe",development);}catch(e){const reason=["auth required","jwt invalid","alg invalid","key service unavailable","key fetch failed","key redirect denied","key decode failed","token decode failed","key import failed","signature verification failed","key set invalid","key not found","signature invalid","claims invalid","workflow denied","run identity invalid"].includes(e?.message)?e.message:"verification error";return json({error:"Unauthorized",...(u.pathname==="/runner/probe"?{reason}: {})},401);}
-    if(u.pathname==="/runner/probe"||u.pathname==="/runner/preflight")return json({authenticated:true,owner_oauth_configured:accessConfigured(env),scope:u.pathname==="/runner/probe"?"github-hosted-readonly-probe":"github-hosted-readonly-live"});
+    if(u.pathname==="/runner/probe"||u.pathname==="/runner/preflight"||u.pathname==="/development/preflight")return json({authenticated:true,owner_oauth_configured:accessConfigured(env),scope:u.pathname==="/runner/probe"?"github-hosted-readonly-probe":"github-hosted-readonly-live"});
     if(!accessConfigured(env))return json({error:"Owner OAuth not configured"},503);
     let body={};
     if(development||u.pathname.endsWith("/result")){try{body=await readBody(req);}catch{return json({error:"Invalid result"},400);}}
