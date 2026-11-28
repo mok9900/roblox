@@ -1,4 +1,5 @@
-// Private read-only MCP relay. No game mutation or arbitrary RPC forwarding.
+// Private owner-authenticated MCP relay; v1 proof plus bounded v2 development sessions.
+import {DevelopmentBroker} from "./development_broker.mjs";
 const HOST = "roblox-mcp.parcel-mcp-seojun.workers.dev";
 const URL_BASE = "https://" + HOST;
 const GH_ISSUER = "https://token.actions.githubusercontent.com";
@@ -53,10 +54,11 @@ export function runnerIdentity(p,probe=false) {
   if(!/^\d+$/.test(String(p.run_id))||!/^\d+$/.test(String(p.run_attempt))) throw Error("run identity invalid");
   return String(p.run_id)+":"+String(p.run_attempt);
 }
-async function runnerAuth(req,probe) {
+async function runnerAuth(req,probe,development=false) {
   const auth=req.headers.get("Authorization")||"";
   if(!auth.startsWith("Bearer ")) throw Error("auth required");
   const p=await verifyJwt(auth.slice(7),GH_ISSUER,GH_AUD,GH_ISSUER+"/.well-known/jwks");
+  if(development&&p.event_name!=="workflow_dispatch")throw Error("workflow denied");
   return runnerIdentity(p,probe);
 }
 function accessConfigured(env) {
@@ -100,9 +102,38 @@ async function rpc(req,env) {
     return ok({protocolVersion:supported.includes(p.protocolVersion)?p.protocolVersion:"2025-11-25",capabilities:{tools:{listChanged:false}},serverInfo:{name:"roblox-workers-relay",version:"0.1.0"}});
   }
   if(m.method==="ping")return ok({});
-  if(m.method==="tools/list")return ok({tools:[TOOL]});
+  const dev=env.RELAY.get(env.RELAY.idFromName("development-v2"));
+  let catalog=[];
+  try{
+    const d=await dev.fetch("https://relay.internal/development/catalog",{method:"POST"});
+    if(d.ok){const c=await d.json();if(Array.isArray(c.tools))catalog=c.tools;}
+  }catch{}
+  const listTool={name:"list_studio_tools",description:"List the native tools of the active verified local Studio development session.",inputSchema:{type:"object",properties:{},additionalProperties:false},annotations:{readOnlyHint:true}};
+  const callTool={name:"call_studio_tool",description:"Invoke a discovered native tool on the exact local Studio fixture. Requires the current Studio ID where the native schema requires it. Edits require explicit local-edit session opt-in.",inputSchema:{type:"object",properties:{name:{type:"string"},arguments:{type:"object"}},required:["name","arguments"],additionalProperties:false}};
+  if(m.method==="tools/list")return ok({tools:catalog.length?[TOOL,listTool,callTool,...catalog]:[TOOL]});
   if(m.method!=="tools/call")return err(-32601,"Method not found");
-  if(p.name!==TOOL.name||JSON.stringify(p.arguments??{})!=="{}")return err(-32602,"Tool denied");
+  if(p.name==="list_studio_tools"){
+    if(JSON.stringify(p.arguments??{})!=="{}")return err(-32602,"Invalid arguments");
+    return ok({content:[{type:"text",text:JSON.stringify({tools:catalog})}],isError:!catalog.length});
+  }
+  let action={name:p.name,arguments:p.arguments??{}};
+  if(p.name==="call_studio_tool"){
+    if(!p.arguments||typeof p.arguments!=="object"||Array.isArray(p.arguments)||Object.keys(p.arguments).sort().join(",")!=="arguments,name")return err(-32602,"Invalid arguments");
+    action=p.arguments;
+  }
+  if(!action.arguments||typeof action.arguments!=="object"||Array.isArray(action.arguments))return err(-32602,"Invalid arguments");
+  if(action.name===TOOL.name&&JSON.stringify(action.arguments)!=="{}")return err(-32602,"Invalid arguments");
+  if(catalog.length){
+    if(action.name!==TOOL.name&&!catalog.some(t=>t.name===action.name))return err(-32602,"Tool denied");
+    try{
+      const r=await dev.fetch("https://relay.internal/development/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(action)});
+      if(!r.ok)return ok({content:[{type:"text",text:"Development request unavailable, busy, or outcome unknown. Do not automatically replay mutations."}],isError:true});
+      const v=await r.json();
+      if(!v.result||!Array.isArray(v.result.content))throw Error("invalid tool result");
+      return ok(v.result);
+    }catch{return ok({content:[{type:"text",text:"Development request failed; outcome unknown."}],isError:true});}
+  }
+  if(action.name!==TOOL.name||p.name!==TOOL.name)return err(-32602,"Development runner unavailable or tool denied");
   const unavailable=()=>ok({content:[{type:"text",text:"Live CI Studio verification unavailable; no connection claimed."}],isError:true});
   try{
     const broker=env.RELAY.get(env.RELAY.idFromName("single-ci"));
@@ -125,22 +156,34 @@ export default {
       if(req.method!=="POST")return json({error:"Method not allowed"},405);
       return rpc(req,env);
     }
-    if(!["/runner/probe","/runner/preflight","/runner/poll","/runner/result"].includes(u.pathname)||req.method!=="POST")return json({error:"Not found"},404);
+    const development=["/development/register","/development/poll","/development/result"].includes(u.pathname);
+    if((!development&&!["/runner/probe","/runner/preflight","/runner/poll","/runner/result"].includes(u.pathname))||req.method!=="POST")return json({error:"Not found"},404);
     let id;
-    try{id=await runnerAuth(req,u.pathname==="/runner/probe");}catch(e){const reason=["auth required","jwt invalid","alg invalid","key service unavailable","key fetch failed","key redirect denied","key decode failed","token decode failed","key import failed","signature verification failed","key set invalid","key not found","signature invalid","claims invalid","workflow denied","run identity invalid"].includes(e?.message)?e.message:"verification error";return json({error:"Unauthorized",...(u.pathname==="/runner/probe"?{reason}: {})},401);}
+    try{id=await runnerAuth(req,u.pathname==="/runner/probe",development);}catch(e){const reason=["auth required","jwt invalid","alg invalid","key service unavailable","key fetch failed","key redirect denied","key decode failed","token decode failed","key import failed","signature verification failed","key set invalid","key not found","signature invalid","claims invalid","workflow denied","run identity invalid"].includes(e?.message)?e.message:"verification error";return json({error:"Unauthorized",...(u.pathname==="/runner/probe"?{reason}: {})},401);}
     if(u.pathname==="/runner/probe"||u.pathname==="/runner/preflight")return json({authenticated:true,owner_oauth_configured:accessConfigured(env),scope:u.pathname==="/runner/probe"?"github-hosted-readonly-probe":"github-hosted-readonly-live"});
     if(!accessConfigured(env))return json({error:"Owner OAuth not configured"},503);
     let body={};
-    if(u.pathname.endsWith("/result")){try{body=await readBody(req);}catch{return json({error:"Invalid result"},400);}}
-    const broker=env.RELAY.get(env.RELAY.idFromName("single-ci"));
+    if(development||u.pathname.endsWith("/result")){try{body=await readBody(req);}catch{return json({error:"Invalid result"},400);}}
+    const broker=env.RELAY.get(env.RELAY.idFromName(development?"development-v2":"single-ci"));
     return broker.fetch("https://relay.internal"+u.pathname,{method:"POST",headers:{"Content-Type":"application/json","X-Verified-Runner":id},body:JSON.stringify(body)});
   }
 };
 export class Relay {
-  constructor(){this.active=null;this.lastRunner=null;}
+  constructor(){this.active=null;this.lastRunner=null;this.development=new DevelopmentBroker();}
   async fetch(req) {
     const path=new URL(req.url).pathname;
     if(req.method!=="POST")return json({error:"Method not allowed"},405);
+    if(path.startsWith("/development/")){
+      let v;const id=req.headers.get("X-Verified-Runner");
+      if(path==="/development/catalog")v=this.development.catalog();
+      else if(path==="/development/request")v=await this.development.request(await req.json());
+      else if(!id)return json({error:"Unauthorized"},401);
+      else if(path==="/development/register")v=this.development.register(id,await req.json());
+      else if(path==="/development/poll")v=this.development.poll(id,await req.json());
+      else if(path==="/development/result")v=this.development.result(id,await req.json());
+      else return json({error:"Not found"},404);
+      return json(v.value,v.status);
+    }
     if(path==="/request"){
       if(!this.lastRunner||Date.now()-this.lastRunner.at>20000)return json({error:"Runner unavailable"},503);
       if(this.active)return json({error:"Busy"},409);
