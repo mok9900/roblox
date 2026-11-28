@@ -130,8 +130,8 @@ def click_center(c):
     rect=c.rectangle()
     click_abs((rect.left+rect.right)//2,(rect.top+rect.bottom)//2)
 
-def verified_browser_origin(win):
-    """Only type into a visible official HTTPS Roblox page, never by title alone."""
+def verified_browser_url(win):
+    """Return the exact unique official URL in memory; never log it."""
     from urllib.parse import urlsplit
     found=set()
     for c in win.descendants(control_type="Edit"):
@@ -144,10 +144,34 @@ def verified_browser_origin(win):
                 continue
             u=urlsplit(value)
             if u.scheme=="https" and u.hostname in {"roblox.com","www.roblox.com","auth.roblox.com"} and not u.username and not u.password and u.port in (None,443):
-                found.add(u.hostname)
+                found.add(value)
         except Exception:
             continue
-    return len(found)==1
+    return next(iter(found)) if len(found)==1 else None
+
+def verified_browser_origin(win):
+    return verified_browser_url(win) is not None
+
+def fresh_form(hwnd,expected_url,require_enabled=False,allow_refocus=False):
+    """Never use stale UIA elements or switch to another window or URL."""
+    form=browser_form()
+    if not form:
+        return None
+    win,edits=form
+    if win.handle!=hwnd or not expected_url or verified_browser_url(win)!=expected_url:
+        return None
+    target,_,_=submit_target(win,edits[1],require_enabled=require_enabled)
+    if target is None:
+        return None
+    if user32.GetForegroundWindow()!=hwnd:
+        if not allow_refocus or not focus_studio(win):
+            return None
+        # Activation may have changed the document. Resolve it again.
+        return fresh_form(hwnd,expected_url,require_enabled,False)
+    if verified_browser_url(win)!=expected_url or user32.GetForegroundWindow()!=hwnd:
+        return None
+    return win,edits,target
+
 
 def submit_target(win, password_edit, require_enabled=False):
     """Deduplicate identical UIA wrappers, require a single aligned submit target."""
@@ -222,24 +246,48 @@ if target is None:
     raise SystemExit("ROBLOX_BROWSER_ORIGIN_OR_SUBMIT_UNVERIFIED: no credentials typed")
 if not focus_studio(win) or not verified_browser_origin(win):
     raise SystemExit("ROBLOX_BROWSER_FOCUS_OR_ORIGIN_UNVERIFIED: no credentials typed")
+expected_url=verified_browser_url(win)
+hwnd=win.handle
+current=fresh_form(hwnd,expected_url)
+if current is None:
+    raise SystemExit("ROBLOX_BROWSER_FORM_CHANGED: no credentials typed")
 print("ROBLOX_EDGE_FORM_VERIFIED: official HTTPS origin and unique credential form and submit target.",flush=True)
-click_center(edits[0]);type_unicode(username)
+win,edits,_=current
+click_center(edits[0])
+if user32.GetForegroundWindow()!=hwnd or verified_browser_url(win)!=expected_url or not edits[0].has_keyboard_focus():
+    raise SystemExit("ROBLOX_BROWSER_USERNAME_FOCUS_UNVERIFIED: no credentials typed")
+type_unicode(username)
 time.sleep(.3)
-if user32.GetForegroundWindow()!=win.handle:
-    raise SystemExit("ROBLOX_BROWSER_FOCUS_LOST: no further input")
-click_center(edits[1]);type_unicode(password)
+current=fresh_form(hwnd,expected_url)
+if current is None:
+    raise SystemExit("ROBLOX_BROWSER_FORM_CHANGED: no password typed")
+win,edits,_=current
+click_center(edits[1])
+if user32.GetForegroundWindow()!=hwnd or verified_browser_url(win)!=expected_url or not edits[1].has_keyboard_focus():
+    raise SystemExit("ROBLOX_BROWSER_PASSWORD_FOCUS_UNVERIFIED: no password typed")
+type_unicode(password)
 time.sleep(.5)
-deadline=time.monotonic()+12
-target=None
+# No more credential input. Allow a transient focus/UIA refresh, but never
+# submit after a URL or window change. At most one guarded reactivation.
+deadline=time.monotonic()+15
+current=None
+refocus_used=False
 while time.monotonic()<deadline:
-    if user32.GetForegroundWindow()!=win.handle or not verified_browser_origin(win):
-        raise SystemExit("ROBLOX_BROWSER_FOCUS_OR_ORIGIN_CHANGED: no submit")
-    target,labels,unique=submit_target(win,edits[1],require_enabled=True)
-    if target is not None:
+    if user32.GetForegroundWindow()!=hwnd and not refocus_used:
+        form=browser_form()
+        if form and form[0].handle==hwnd and verified_browser_url(form[0])==expected_url:
+            refocus_used=True
+            current=fresh_form(hwnd,expected_url,True,True)
+    else:
+        current=fresh_form(hwnd,expected_url,True)
+    if current is not None:
         break
     time.sleep(.5)
-if target is None:
-    raise SystemExit("ROBLOX_BROWSER_SUBMIT_NOT_UNIQUE: credentials not submitted")
+if current is None:
+    raise SystemExit("ROBLOX_BROWSER_FOCUS_OR_ORIGIN_CHANGED: no submit")
+win,edits,target=current
+if user32.GetForegroundWindow()!=hwnd or verified_browser_url(win)!=expected_url:
+    raise SystemExit("ROBLOX_BROWSER_FINAL_GUARD_FAILED: no submit")
 click_center(target)
 print("ROBLOX_BROWSER_CREDENTIALS_SUBMITTED: official page button clicked, values not logged.",flush=True)
 username="";password=""
