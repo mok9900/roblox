@@ -42,6 +42,22 @@ class BridgeTests(unittest.TestCase):
         self.assertFalse(result["verified"])
         self.assertEqual(result["matching_local_fixtures"],0)
 
+    def test_proof_shape_never_exposes_raw_identity(self):
+        record={"name":bridge.FIXTURE,"file":"C:/private-folder/CI_Only_Baseplate_Test.rbxlx","id":"private-id","persistedToCloud":False,"unknown-secret-key":"private-value"}
+        shape=bridge.proof_shape({"content":[{"type":"text","text":json.dumps({"studios":[record]})}]})
+        self.assertEqual(shape["studio_records"],1)
+        self.assertEqual(shape["exact_file"],1)
+        self.assertEqual(shape["local_records"],1)
+        self.assertEqual(shape["json_text"],1)
+        encoded=json.dumps(shape)
+        for secret in ("private-folder","private-id","private-value","unknown-secret-key",bridge.FIXTURE):
+            self.assertNotIn(secret,encoded)
+
+    def test_proof_shape_distinguishes_empty_and_unstructured(self):
+        self.assertEqual(bridge.proof_shape({"studios":[]})["empty_arrays"],1)
+        self.assertEqual(bridge.proof_shape({"content":[{"type":"text","text":"No studios available"}]})["other_text"],1)
+        self.assertEqual(bridge.proof_shape({"studios":[{"name":bridge.FIXTURE}]})["missing_local_flag"],1)
+
     def test_secret_environment_not_inherited(self):
         with patch.dict(os.environ,{"ROBLOX_PASSWORD":"synthetic","CF_ACCESS_ALLOWED_EMAIL":"synthetic","OPENAI_TUNNEL_RUNTIME_KEY":"synthetic","CLOUDFLARE_TUNNEL_TOKEN":"synthetic","GMAIL_OAUTH_REFRESH_TOKEN":"synthetic"}):
             env = bridge.safe_env()
