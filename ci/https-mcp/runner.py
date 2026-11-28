@@ -61,7 +61,7 @@ class Runner:
         return token
 
     def post(self, path, payload=None):
-        if path not in ("/runner/preflight","/runner/poll","/runner/result","/development/register","/development/poll","/development/result"):
+        if path not in ("/runner/preflight","/runner/poll","/runner/result","/development/preflight","/development/register","/development/poll","/development/result"):
             raise ValueError("invalid relay path")
         data = json.dumps(payload or {},separators=(",",":")).encode()
         req = urllib.request.Request(BASE+path,data=data,method="POST",headers={"Authorization":"Bearer "+self.get_token(),"Content-Type":"application/json","Accept":"application/json","User-Agent":"roblox-mcp-relay/0.1"})
