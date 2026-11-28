@@ -289,6 +289,30 @@ class EmailDeliveryConfirmationTests(unittest.TestCase):
         c = Control("Button", "Send verification code via email")
         self.assertIs(scope["find_email_send_confirmation"]([c]), c)
 
+    def test_browser_prefilled_email_and_send_code(self):
+        field = Control("Edit", "Email")
+        field.get_value = lambda: "a***@example.com"
+        button = Control("Button", "Send code")
+        self.assertIs(scope["find_email_send_confirmation"]([field,button]),button)
+
+    def test_empty_destination_not_filled_or_clicked(self):
+        field = Control("Edit", "Email")
+        field.get_value = lambda: ""
+        self.assertIsNone(scope["find_email_send_confirmation"]([field,Control("Button","Send code")]))
+
+    def test_generic_send_code_without_email_evidence_rejected(self):
+        field = Control("Edit", "Phone")
+        field.get_value = lambda: "+123456789"
+        self.assertIsNone(scope["find_email_send_confirmation"]([field,Control("Button","Send code")]))
+        self.assertIsNone(scope["find_email_send_confirmation"]([Control("Button","Send code")]))
+
+    def test_multiple_destinations_or_buttons_rejected(self):
+        field = Control("Edit","Email")
+        field.get_value = lambda: "a***@example.com"
+        button = Control("Button","Send code")
+        self.assertIsNone(scope["find_email_send_confirmation"]([field,Control("Edit","Email"),button]))
+        self.assertIsNone(scope["find_email_send_confirmation"]([field,button,Control("Button","Send code")]))
+
     def test_generic_next_never_clicked(self):
         self.assertIsNone(scope["find_email_send_confirmation"]([Control("Button", "Next")]))
 
