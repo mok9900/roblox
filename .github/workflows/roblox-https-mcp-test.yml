@@ -29,6 +29,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'BRIDGE_REGRESSION_FAILED' }
           python ci/https-mcp/test_runner.py
           if ($LASTEXITCODE -ne 0) { throw 'RUNNER_REGRESSION_FAILED' }
+          python ci/https-mcp/test_studio_session.py
+          if ($LASTEXITCODE -ne 0) { throw 'STUDIO_SESSION_REGRESSION_FAILED' }
 
       - uses: actions/setup-node@v4
         with:
