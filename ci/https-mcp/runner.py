@@ -9,6 +9,7 @@ import urllib.request
 import uuid
 
 from bridge import verify_upstream
+from studio_session import StudioSession
 
 BASE = "https://roblox-mcp.parcel-mcp-seojun.workers.dev"
 AUDIENCE = BASE + "/runner"
@@ -106,32 +107,33 @@ def main():
     print("WORKERS_LIVE_PREFLIGHT_VERIFIED",flush=True)
     if args.preflight:
         return
-    proof=verify_upstream(startup_wait=60)
-    if not proof.get("verified") or proof.get("matching_local_fixtures")!=1:
-        raise RuntimeError("official Studio local fixture not verified")
-    print("WORKERS_LOCAL_OFFICIAL_STUDIO_MCP_VERIFIED",flush=True)
-    end=time.monotonic()+args.duration
-    errors=0
-    ready=False
-    while time.monotonic()<end:
-        try:
-            job=client.post("/runner/poll")
-            if not ready:
-                print("WORKERS_RELAY_READY",flush=True)
-                ready=True
-            result=execute_job(job)
-            if result is not None:
-                ack=client.post("/runner/result",result)
-                if ack.get("accepted") is not True:
-                    raise RuntimeError("result not accepted")
-                print("WORKERS_RELAY_READONLY_RESULT_ACCEPTED",flush=True)
-            errors=0
-        except Exception:
-            errors+=1
-            print("WORKERS_RELAY_RETRY: classified failure; sensitive details omitted",flush=True)
-            if errors>=5:
-                raise RuntimeError("relay repeatedly unavailable") from None
-        time.sleep(5 if errors==0 else min(30,5*errors))
+    with StudioSession() as session:
+        proof=session.verify(startup_wait=60)
+        if not proof.get("verified") or proof.get("matching_local_fixtures")!=1:
+            raise RuntimeError("official Studio local fixture not verified")
+        print("WORKERS_LOCAL_OFFICIAL_STUDIO_MCP_VERIFIED",flush=True)
+        end=time.monotonic()+args.duration
+        errors=0
+        ready=False
+        while time.monotonic()<end:
+            try:
+                job=client.post("/runner/poll")
+                if not ready:
+                    print("WORKERS_RELAY_READY",flush=True)
+                    ready=True
+                result=execute_job(job,session.verify)
+                if result is not None:
+                    ack=client.post("/runner/result",result)
+                    if ack.get("accepted") is not True:
+                        raise RuntimeError("result not accepted")
+                    print("WORKERS_RELAY_READONLY_RESULT_ACCEPTED",flush=True)
+                errors=0
+            except Exception:
+                errors+=1
+                print("WORKERS_RELAY_RETRY: classified failure; sensitive details omitted",flush=True)
+                if errors>=5:
+                    raise RuntimeError("relay repeatedly unavailable") from None
+            time.sleep(5 if errors==0 else min(30,5*errors))
 
 if __name__=="__main__":
     try:
