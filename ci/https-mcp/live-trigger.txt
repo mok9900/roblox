@@ -7,3 +7,5 @@
 2026-11-27 — single integration retry with official-origin challenge detection and bounded safe form diagnostics (eaee128c).
 
 2026-11-28 — single integration attempt following successful email delivery confirmation regression; no generic challenge controls, no bypass.
+
+2026-11-28 — authenticated setup succeeded in 46105911928; single diagnostic rerun using tested official stdio stage markers and structured proof parser.
