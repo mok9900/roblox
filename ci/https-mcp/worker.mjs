@@ -1,5 +1,5 @@
 // Private owner-authenticated MCP relay; v1 proof plus bounded v2 development sessions.
-import {DevelopmentBroker} from "./development_broker.mjs";
+import {DurableDevelopmentRelay} from "./development_broker.mjs";
 const HOST = "roblox-mcp.parcel-mcp-seojun.workers.dev";
 const URL_BASE = "https://" + HOST;
 const GH_ISSUER = "https://token.actions.githubusercontent.com";
@@ -171,19 +171,18 @@ export default {
   }
 };
 export class Relay {
-  constructor(){this.active=null;this.lastRunner=null;this.development=new DevelopmentBroker();}
+  constructor(state){this.active=null;this.lastRunner=null;this.development=state?.storage?new DurableDevelopmentRelay(state.storage):null;}
   async fetch(req) {
     const path=new URL(req.url).pathname;
     if(req.method!=="POST")return json({error:"Method not allowed"},405);
     if(path.startsWith("/development/")){
-      let v;const id=req.headers.get("X-Verified-Runner");
-      if(path==="/development/catalog")v=this.development.catalog();
-      else if(path==="/development/request")v=await this.development.request(await req.json());
-      else if(!id)return json({error:"Unauthorized"},401);
-      else if(path==="/development/register")v=this.development.register(id,await req.json());
-      else if(path==="/development/poll")v=this.development.poll(id,await req.json());
-      else if(path==="/development/result")v=this.development.result(id,await req.json());
-      else return json({error:"Not found"},404);
+      if(!this.development)return json({error:"Development storage unavailable"},503);
+      const id=req.headers.get("X-Verified-Runner");
+      let body={};
+      if(path!=="/development/catalog"){
+        try{body=await req.json();}catch{return json({error:"Invalid body"},400);}
+      }
+      const v=await this.development.call(path,id,body);
       return json(v.value,v.status);
     }
     if(path==="/request"){
