@@ -12,7 +12,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   launch:
-    if: github.repository == 'mok9900/roblox' && github.event.head_commit.message == 'ci: start one bounded RS v2 integration smoke'
+    if: >-
+      github.repository == 'mok9900/roblox' && github.event.head_commit.message == 'ci: start one bounded RS v2 integration smoke'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
