@@ -23,9 +23,9 @@ export class DevelopmentBroker {
   constructor({now=()=>Date.now(),makeId=()=>crypto.randomUUID(),requestTimeout=60000}={}){
     this.now=now;this.makeId=makeId;this.requestTimeout=requestTimeout;
     this.session=null;this.active=null;this.standby=null;this.pending=null;
-    this.generation=0;this.used=new Set();
+    this.generation=0;this.used=new Set();this.blocked=false;
   }
-  fresh(r){return !!r&&this.now()<r.deadline&&this.now()-r.at<=FRESH&&this.now()<this.session.end;}
+  fresh(r){return !!this.session&&!!r&&this.now()<r.deadline&&this.now()-r.at<=FRESH&&this.now()<this.session.end;}
   promote(){
     if(this.pending||!this.fresh(this.standby))return false;
     this.active=this.standby;this.standby=null;this.generation++;return true;
@@ -33,7 +33,7 @@ export class DevelopmentBroker {
   clean(){
     if(this.standby&&this.now()>=this.standby.deadline)this.standby=null;
     if(this.session&&this.now()>=this.session.end&&!this.pending){
-      this.session=null;this.active=null;this.standby=null;this.used.clear();
+      this.session=null;this.active=null;this.standby=null;this.used.clear();this.blocked=false;
     }
   }
   register(id,b){
@@ -49,6 +49,7 @@ export class DevelopmentBroker {
       existing.at=now;existing.catalog=b.catalog;return reply({registered:true});
     }
     if(this.used.has(id))return error("Runner retired",410);
+    if(this.active&&this.session.edits)return error("Editing sessions cannot roll without checkpoint transfer");
     if(this.active&&this.standby)return error("Standby occupied");
     if(this.active&&now<this.active.deadline-OVERLAP&&this.fresh(this.active))return error("Outside handoff window");
     const candidate={id,deadline:b.deadline,at:now,catalog:b.catalog};
@@ -72,10 +73,11 @@ export class DevelopmentBroker {
   }
   catalog(){
     this.clean();if(!this.pending)this.promote();
-    return this.fresh(this.active)?reply({tools:this.active.catalog}):error("Development runner unavailable",503);
+    return !this.blocked&&this.fresh(this.active)?reply({tools:this.active.catalog}):error("Development runner unavailable",503);
   }
   request(action){
     this.clean();if(!this.pending)this.promote();
+    if(this.blocked)return error("Interrupted edit session; manual reconciliation required",409);
     if(!this.fresh(this.active))return error("Development runner unavailable",503);
     if(this.pending)return error("Busy",409);
     if(!isObject(action)||!isObject(action.arguments)||typeof action.name!=="string"||bytes(action)>60000)return error("Invalid action",400);
@@ -83,7 +85,7 @@ export class DevelopmentBroker {
     const id=this.makeId(),runner=this.active.id,generation=this.generation;
     return new Promise(resolve=>{
       const timer=setTimeout(()=>{
-        if(this.pending?.id===id)this.pending=null;
+        if(this.pending?.id===id){if(this.session?.edits&&this.pending.delivered)this.blocked=true;this.pending=null;}
         resolve(error("Request timeout; outcome unknown",504));
       },this.requestTimeout);
       this.pending={id,runner,generation,action,delivered:false,finish:(v)=>{
@@ -91,10 +93,72 @@ export class DevelopmentBroker {
       }};
     });
   }
+  snapshot(){
+    return {version:1,session:this.session,active:this.active,standby:this.standby,generation:this.generation,used:[...this.used],blocked:this.blocked,
+      interrupted:this.pending?{id:this.pending.id,runner:this.pending.runner,generation:this.pending.generation,delivered:this.pending.delivered}:null};
+  }
+  restore(v){
+    if(!isObject(v)||v.version!==1||!Number.isSafeInteger(v.generation)||v.generation<0||!Array.isArray(v.used)||v.used.some(x=>!RUN.test(x))||typeof v.blocked!=="boolean")throw Error("Invalid stored development state");
+    if(v.session!==null&&(!isObject(v.session)||!UUID.test(v.session.id)||!Number.isSafeInteger(v.session.end)||typeof v.session.edits!=="boolean"))throw Error("Invalid stored session");
+    for(const r of [v.active,v.standby])if(r!==null&&(!v.session||!isObject(r)||!RUN.test(r.id)||!v.used.includes(r.id)||!Number.isSafeInteger(r.deadline)||r.deadline>v.session.end||!Number.isSafeInteger(r.at)||!validCatalog(r.catalog,v.session.edits)))throw Error("Invalid stored runner");
+    this.session=v.session;this.active=v.active;this.standby=v.standby;this.used=new Set(v.used);this.generation=v.generation;this.blocked=v.blocked;
+    if(v.interrupted){
+      // An old request may have reached Studio. Never restore its payload or replay it.
+      this.generation++;
+      if(this.session?.edits&&v.interrupted.delivered)this.blocked=true;
+    }
+    this.pending=null;this.clean();
+  }
   result(id,b){
     const p=this.pending;
     if(!p||!p.delivered||p.runner!==id||b?.request_id!==p.id||b.generation!==p.generation)return error("Stale request");
     if(!isObject(b.result)||bytes(b.result)>60000)return error("Invalid result",400);
     p.finish(reply({result:b.result}));this.promote();return reply({accepted:true});
+  }
+}
+
+// Serialize storage writes and protocol transitions, but never hold the lock
+// while waiting for a runner result. Persist the delivery fence before returning
+// the job to the runner. No request arguments or tool results are stored.
+export class DurableDevelopmentRelay {
+  constructor(storage,options={}){
+    this.storage=storage;this.broker=new DevelopmentBroker(options);
+    this.tail=Promise.resolve();this.loaded=false;this.failed=false;
+  }
+  step(fn){
+    const task=this.tail.then(async()=>{
+      if(this.failed)throw Error("Development storage unavailable");
+      try{
+        if(!this.loaded){
+          const saved=await this.storage.get("development-state-v1");
+          if(saved!==undefined)this.broker.restore(saved);
+          this.loaded=true;
+        }
+        const out=fn(this.broker);
+        await this.storage.put("development-state-v1",this.broker.snapshot());
+        return out;
+      }catch(e){this.failed=true;throw e;}
+    });
+    this.tail=task.catch(()=>{});
+    return task;
+  }
+  async call(path,id,body){
+    try{
+      if(path==="/development/request"){
+        const box=await this.step(b=>({wait:b.request(body)}));
+        const result=await box.wait;
+        // Confirm result/timeout transition durably committed before replying.
+        await this.step(()=>null);
+        return result;
+      }
+      return await this.step(b=>{
+        if(path==="/development/catalog")return b.catalog();
+        if(!id)return error("Unauthorized",401);
+        if(path==="/development/register")return b.register(id,body);
+        if(path==="/development/poll")return b.poll(id,body);
+        if(path==="/development/result")return b.result(id,body);
+        return error("Not found",404);
+      });
+    }catch{return error("Development storage unavailable; outcome unknown",503);}
   }
 }
